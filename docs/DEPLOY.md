@@ -8,6 +8,8 @@ Autor stránky ji nenasazoval; vše potřebné je zde a v souboru `index.html`.
 | Soubor | Účel |
 |---|---|
 | `docs/index.html` | celá prezentace, jeden statický soubor: HTML, CSS i JavaScript uvnitř, žádný build |
+| `docs/og-image.png` | sociální náhled 1200×630 px (`og:image`, `twitter:image`); vygenerován z `docs/og-source.html` |
+| `docs/og-source.html` | zdroj náhledu; při změně textu znovu vyrenderovat (viz Údržba) |
 | `docs/.nojekyll` | vypíná Jekyll na GitHub Pages, aby se soubory podávaly beze změny |
 | `docs/DEPLOY.md` | tento návod |
 
@@ -16,8 +18,8 @@ Libre Caslon Text, Source Sans 3 a IBM Plex Mono. Vše má deklarované náhradn
 funguje i bez nich. Žádná analytika, žádné cookies, žádné API volání z prohlížeče návštěvníka.
 
 Stránka je česky (cílová skupina jsou čeští právníci a vývojáři), v hlavičce má anglické shrnutí.
-Obsahuje pouze veřejné informace o projektu. Neobsahuje žádný API klíč ani osobní údaje. Obrázky nejsou,
-favicon je inline SVG (znak §).
+Obsahuje pouze veřejné informace o projektu. Neobsahuje žádný API klíč ani osobní údaje. Jediný obrázek je
+sociální náhled `og-image.png`; favicon je inline SVG (znak §).
 
 ## Doporučený postup: GitHub Pages ze složky `docs/`
 
@@ -32,8 +34,8 @@ gh api repos/LexaurinTheDog/esbirka-skill/pages --jq '.html_url + " " + .status'
 
 Nebo v nastavení repozitáře: Settings → Pages → Source „Deploy from a branch“ → Branch `main`, folder `/docs`.
 
-Výsledná adresa: `https://lexaurinthedog.github.io/esbirka-skill/`. Tuto adresu už obsahuje `og:url`
-v hlavičce `index.html`; při jiné doméně ji změňte.
+Výsledná adresa: `https://lexaurinthedog.github.io/esbirka-skill/`. Tuto adresu už obsahují `og:url`, `og:image`
+a `twitter:image` v hlavičce `index.html` (sociální sítě vyžadují absolutní URL obrázku); při jiné doméně je změňte.
 
 Každý další push do `main`, který změní `docs/`, se nasadí automaticky během minuty.
 
@@ -52,7 +54,7 @@ Statický hosting bez buildu, kořenový adresář `docs/`:
 
 1. Přidejte soubor `docs/CNAME` s doménou (např. `esbirka.example.cz`) a nasměrujte DNS podle
    dokumentace zvoleného hostingu (u GitHub Pages CNAME záznam na `lexaurinthedog.github.io`).
-2. Upravte `og:url` v `docs/index.html`.
+2. Upravte `og:url`, `og:image` a `twitter:image` v `docs/index.html` na novou doménu.
 3. U GitHub Pages zapněte „Enforce HTTPS“ po vystavení certifikátu.
 
 ## Kontrola po nasazení
@@ -64,6 +66,8 @@ Statický hosting bez buildu, kořenový adresář `docs/`:
   po najetí ukazuje interval účinnosti a novely.
 - Na šířce pod 900 px se postranní sloupce skládají pod sebe, tabulky rolují vodorovně uvnitř svého rámu.
 - Doporučeno projet Lighthouse (Performance, Accessibility, SEO); stránka nemá žádné blokující skripty.
+- Sociální náhled ověřte nástrojem platformy (např. opengraph.xyz, LinkedIn Post Inspector, X Card Validator);
+  obrázek musí být dostupný na absolutní adrese z meta tagu `og:image`.
 
 ## Údržba obsahu
 
@@ -75,5 +79,16 @@ Zdroj pravdy o funkcích je repozitář (README, SKILL.md). Při změně verze s
 - data časové osy jen tehdy, změní-li se ukázkový předpis; jsou to skutečné hodnoty z `esbirka zneni 89/2012`
   ke dni 5. 9. 2026 a jako taková jsou v popisku datovaná.
 
-Doporučené sociální náhledy (`og:image`) stránka nemá; pokud je hosting vyžaduje, vytvořte PNG 1200×630
-s názvem a taglinem ve stejných barvách (oxblood `#7B1E2E` na papírové `#F4F3EE`) a doplňte meta tag.
+Sociální náhled (`og-image.png`) se generuje z `docs/og-source.html` headless prohlížečem, aby písma odpovídala stránce:
+
+```bash
+python3 - <<'PY'
+from playwright.sync_api import sync_playwright
+with sync_playwright() as p:
+    b=p.chromium.launch(); pg=b.new_page(viewport={"width":1200,"height":630})
+    pg.goto("file://"+__import__("os").path.abspath("docs/og-source.html")); pg.wait_for_timeout(3000)
+    pg.screenshot(path="docs/og-image.png", clip={"x":0,"y":0,"width":1200,"height":630}); b.close()
+PY
+```
+
+Při změně názvu, verze nebo čísel v náhledu upravte `og-source.html` a obrázek přegenerujte.
