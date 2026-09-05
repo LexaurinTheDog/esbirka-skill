@@ -156,6 +156,7 @@ novely tohoto znění: 428/2011 Sb.
 | `skills/esbirka/agents/openai.yaml` | metadata pro Codex |
 | `install.sh` | instalace do Claude Code / Codex / libovolného adresáře |
 | `.claude-plugin/` | manifest pluginu a marketplace pro Claude Code |
+| `docs/` | webová prezentace (`index.html`) a návod k nasazení (`DEPLOY.md`) |
 
 ## Jak to funguje
 

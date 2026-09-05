@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>esbirka-skill</title>
+<meta name="description" content="Skill pro Claude Code, Codex a další kódovací agenty: zákony a jejich časová znění z oficiální české e-Sbírky. Text paragrafu ke dni, srovnání znění, novely. Jeden skript bez závislostí.">
+<meta property="og:title" content="esbirka-skill – e-Sbírka pro kódovací agenty">
+<meta property="og:description" content="Jak zněl § 2079 občanského zákoníku k 1. 5. 2020? Skill odpoví z oficiální e-Sbírky s přesnou citací znění. Claude Code, Codex, Agent Skills.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://lexaurinthedog.github.io/esbirka-skill/">
+<meta name="theme-color" content="#7B1E2E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%237B1E2E'/%3E%3Ctext x='32' y='46' font-family='Georgia,serif' font-size='40' text-anchor='middle' fill='%23F4F3EE'%3E%C2%A7%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --paper:#F4F3EE; --paper-2:#ECEBE4; --ink:#1B1D22; --ink-2:#3C3F46; --muted:#646871; --line:#D6D4CB; --line-2:#C2BFB4;
+  --accent:#7B1E2E; --accent-ink:#5E1522; --accent-soft:#F1E2E4; --accent-line:#D9AEB4;
+  --term-bg:#1E2226; --term-ink:#E6E4DC; --term-dim:#8C929B; --term-ok:#8FD19E; --term-warn:#E7C36B; --term-acc:#F0A3AE;
+  --ok:#2F6B4F; --ok-soft:#E1EEE7;
+  --sans:"Source Sans 3","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --serif:"Libre Caslon Text",Georgia,"Times New Roman",serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --measure:68ch; --gutter:clamp(1rem,4vw,3rem);
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#16181C; --paper-2:#1E2126; --ink:#E9E6DF; --ink-2:#C9C6BE; --muted:#9A9EA6; --line:#2E3238; --line-2:#3C4148;
+    --accent:#D9707E; --accent-ink:#F0A3AE; --accent-soft:#33202480; --accent-line:#6B3640;
+    --term-bg:#0F1114; --term-ink:#E6E4DC; --term-dim:#7E848D; --ok:#7FC79A; --ok-soft:#1F2F27;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#16181C; --paper-2:#1E2126; --ink:#E9E6DF; --ink-2:#C9C6BE; --muted:#9A9EA6; --line:#2E3238; --line-2:#3C4148;
+  --accent:#D9707E; --accent-ink:#F0A3AE; --accent-soft:#33202480; --accent-line:#6B3640;
+  --term-bg:#0F1114; --term-ink:#E6E4DC; --term-dim:#7E848D; --ok:#7FC79A; --ok-soft:#1F2F27;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto} *{animation:none!important;transition:none!important}}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:1.0625rem;line-height:1.55;-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:.15em}
+a:hover{color:var(--accent-ink)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:2px}
+h1,h2,h3{font-family:var(--serif);font-weight:400;line-height:1.15;text-wrap:balance;margin:0}
+h1{font-size:clamp(2.1rem,4.6vw,3.4rem);letter-spacing:-.01em}
+h2{font-size:clamp(1.55rem,2.6vw,2.05rem)}
+h3{font-size:1.25rem;font-family:var(--sans);font-weight:600}
+p{margin:0}
+code,kbd,pre{font-family:var(--mono);font-size:.92em}
+code{background:var(--paper-2);padding:.08em .35em;border-radius:3px}
+pre{margin:0}
+.eyebrow{font-family:var(--sans);font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600}
+
+/* ── shell ── */
+.wrap{max-width:74rem;margin:0 auto;padding:0 var(--gutter)}
+header.top{border-bottom:1px solid var(--line)}
+header.top .wrap{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding-top:1rem;padding-bottom:1rem;flex-wrap:wrap}
+.brand{display:flex;align-items:baseline;gap:.6rem;font-family:var(--serif);font-size:1.25rem;color:var(--ink);text-decoration:none}
+.brand .sig{display:inline-grid;place-items:center;width:1.8rem;height:1.8rem;border-radius:5px;background:var(--accent);color:#F4F3EE;font-size:1.15rem;line-height:1;transform:translateY(.2rem)}
+.brand small{font-family:var(--sans);color:var(--muted);font-size:.85rem}
+nav.top ul{display:flex;gap:1.25rem;list-style:none;margin:0;padding:0;flex-wrap:wrap}
+nav.top a{color:var(--ink-2);text-decoration:none;font-size:.95rem}
+nav.top a:hover{color:var(--accent)}
+.gh{display:inline-flex;align-items:center;gap:.4rem;border:1px solid var(--line-2);padding:.35rem .7rem;border-radius:999px;color:var(--ink);text-decoration:none;font-size:.9rem}
+.gh svg{width:1rem;height:1rem;fill:currentColor}
+
+/* ── hero ── */
+.hero{padding:clamp(2.5rem,6vw,5rem) 0 clamp(2rem,5vw,4rem);border-bottom:1px solid var(--line)}
+.hero .wrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:clamp(1.5rem,4vw,4rem);align-items:start}
+.hero .lead{font-size:1.2rem;color:var(--ink-2);max-width:var(--measure);margin-top:1.1rem}
+.hero .abstract{margin-top:1.25rem;padding-left:1rem;border-left:2px solid var(--accent-line);color:var(--muted);font-style:italic;font-family:var(--serif);font-size:1rem;max-width:var(--measure)}
+.install{margin-top:1.75rem;display:grid;gap:.6rem}
+.cmd{display:flex;align-items:center;gap:.75rem;background:var(--paper-2);border:1px solid var(--line);border-radius:6px;padding:.55rem .6rem .55rem .9rem;font-family:var(--mono);font-size:.9rem}
+.cmd .p{color:var(--accent);user-select:none;flex:none}
+.cmd code{background:none;padding:0;white-space:pre-wrap;overflow-wrap:anywhere;min-width:0;flex:1 1 auto}
+.cmd button{margin-left:auto;flex:none}
+button.copy{font:inherit;font-family:var(--sans);font-size:.78rem;letter-spacing:.04em;border:1px solid var(--line-2);background:var(--paper);color:var(--ink-2);border-radius:4px;padding:.25rem .55rem;cursor:pointer}
+button.copy:hover{border-color:var(--accent);color:var(--accent)}
+.hero-meta{display:flex;gap:1.25rem;flex-wrap:wrap;margin-top:1.25rem;font-size:.9rem;color:var(--muted)}
+.hero-meta b{color:var(--ink);font-weight:600}
+
+/* terminal */
+.term{background:var(--term-bg);color:var(--term-ink);border-radius:8px;box-shadow:0 18px 50px -24px rgba(0,0,0,.55);overflow:hidden;font-family:var(--mono);font-size:.86rem;line-height:1.5}
+.term .bar{display:flex;align-items:center;gap:.45rem;padding:.55rem .8rem;border-bottom:1px solid rgba(255,255,255,.07);color:var(--term-dim);font-size:.75rem;font-family:var(--sans);letter-spacing:.04em}
+.term .bar i{width:.6rem;height:.6rem;border-radius:50%;background:currentColor;opacity:.35;display:inline-block}
+.term pre{padding:1rem 1.1rem 1.15rem;overflow-x:auto;white-space:pre}
+.term .c{color:var(--term-dim)} .term .k{color:var(--term-acc)} .term .h{color:var(--term-warn)} .term .g{color:var(--term-ok)}
+.term .q{color:var(--term-ink)}
+
+/* ── statute sections ── */
+.part{padding:clamp(2.5rem,5vw,4.5rem) 0;border-bottom:1px solid var(--line)}
+.part .wrap{display:grid;grid-template-columns:11rem minmax(0,1fr);gap:clamp(1.25rem,3vw,3rem)}
+.part .margin{position:sticky;top:1.25rem;align-self:start}
+.part .margin .eyebrow{color:var(--accent)}
+.part .margin h2{margin-top:.35rem}
+.part .margin p{margin-top:.6rem;color:var(--muted);font-size:.92rem;max-width:22ch}
+.body{display:grid;gap:2rem;min-width:0}
+.sec{display:grid;gap:.9rem}
+.sec .num{font-family:var(--serif);color:var(--accent);font-size:1.1rem}
+.sec p{max-width:var(--measure);color:var(--ink-2)}
+.sec p strong{color:var(--ink)}
+
+/* Q → command table */
+table{border-collapse:collapse;width:100%;font-size:.97rem}
+th,td{text-align:left;vertical-align:top;padding:.65rem .75rem .65rem 0;border-bottom:1px solid var(--line)}
+th{font-weight:600;color:var(--muted);font-size:.8rem;letter-spacing:.1em;text-transform:uppercase}
+td code{white-space:nowrap}
+.tbl{overflow-x:auto}
+.tbl td:first-child{min-width:18rem}
+
+/* timeline */
+.tl{border:1px solid var(--line);border-radius:8px;padding:1.1rem 1.1rem 1rem;background:var(--paper-2)}
+.tl .cap{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;align-items:baseline;margin-bottom:.8rem}
+.tl .cap b{font-family:var(--serif);font-weight:400;font-size:1.05rem}
+.tl .cap span{font-size:.85rem;color:var(--muted)}
+.tl .track{position:relative;height:2.6rem;display:flex;gap:2px}
+.tl .seg{position:relative;height:100%;border-radius:2px;background:var(--line-2);min-width:2px;transition:background .15s}
+.tl .seg:hover,.tl .seg:focus-visible{background:var(--accent)}
+.tl .seg.now{background:var(--accent)}
+.tl .seg.pick{background:var(--accent-ink);outline:2px solid var(--accent);outline-offset:1px}
+.tl .axis{display:flex;justify-content:space-between;font-family:var(--mono);font-size:.72rem;color:var(--muted);margin-top:.4rem;font-variant-numeric:tabular-nums}
+.tl .info{margin-top:.9rem;font-size:.92rem;color:var(--ink-2);min-height:2.6em;font-variant-numeric:tabular-nums}
+.tl .info b{color:var(--ink);font-weight:600}
+.tl .info em{font-style:normal;color:var(--accent)}
+.cite{font-family:var(--serif);font-size:1.05rem;padding:1rem 1.2rem;border-left:3px solid var(--accent);background:var(--accent-soft);border-radius:0 6px 6px 0;max-width:var(--measure)}
+.cite small{display:block;font-family:var(--sans);font-size:.8rem;color:var(--muted);margin-top:.4rem;letter-spacing:.06em;text-transform:uppercase}
+
+/* tabs */
+.tabs{border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.tabs [role=tablist]{display:flex;flex-wrap:wrap;background:var(--paper-2);border-bottom:1px solid var(--line)}
+.tabs [role=tab]{font:inherit;font-weight:600;font-size:.9rem;background:none;border:0;padding:.7rem 1rem;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs [role=tab][aria-selected=true]{color:var(--accent);border-bottom-color:var(--accent);background:var(--paper)}
+.tabs [role=tabpanel]{padding:1rem 1.1rem 1.1rem;display:grid;gap:.75rem}
+.tabs [role=tabpanel][hidden]{display:none}
+.tabs p{font-size:.95rem}
+.tabs .cmd{background:var(--term-bg);color:var(--term-ink);border-color:transparent}
+.tabs .cmd .p{color:var(--term-acc)}
+.tabs .cmd button.copy{background:transparent;color:var(--term-dim);border-color:rgba(255,255,255,.18)}
+.tabs .cmd button.copy:hover{color:var(--term-ink);border-color:var(--term-ink)}
+
+/* paths */
+.paths{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.6rem;counter-reset:cesta}
+.path{border:1px solid var(--line);border-radius:6px;padding:.9rem .95rem;background:var(--paper);display:grid;gap:.35rem;position:relative}
+.path::before{counter-increment:cesta;content:counter(cesta);font-family:var(--serif);color:var(--accent);font-size:1.3rem;line-height:1}
+.path b{font-weight:600;font-size:.98rem}
+.path span{font-size:.88rem;color:var(--muted)}
+.path code{font-size:.8rem;white-space:normal;word-break:break-all}
+.path+.path::after{content:"→";position:absolute;left:-.75rem;top:.9rem;color:var(--line-2);font-size:1.1rem}
+.note{font-size:.92rem;color:var(--muted);max-width:var(--measure)}
+
+/* agents */
+.rules{display:grid;gap:.75rem;max-width:var(--measure);counter-reset:pravidlo;padding:0;margin:0;list-style:none}
+.rules li{display:grid;grid-template-columns:2.2rem 1fr;gap:.6rem;align-items:baseline;color:var(--ink-2)}
+.rules li::before{counter-increment:pravidlo;content:counter(pravidlo) ".";font-family:var(--serif);color:var(--accent);font-size:1.15rem}
+.rules b{color:var(--ink);font-weight:600}
+.tree{font-family:var(--mono);font-size:.84rem;line-height:1.55;background:var(--paper-2);border:1px solid var(--line);border-radius:6px;padding:1rem 1.1rem;overflow-x:auto;color:var(--ink-2)}
+.tree b{color:var(--accent);font-weight:500}
+
+/* reference table */
+.ref td:first-child{white-space:nowrap}
+.ref td code{white-space:normal}
+
+/* final */
+.final .body p{color:var(--ink-2)}
+footer{padding:2rem 0 3rem;color:var(--muted);font-size:.9rem}
+footer .wrap{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+footer a{color:var(--ink-2)}
+
+@media (max-width:900px){
+  .hero .wrap{grid-template-columns:1fr}
+  .part .wrap{grid-template-columns:1fr}
+  .part .margin{position:static}
+  .part .margin p{max-width:var(--measure)}
+  .paths{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .path+.path::after{display:none}
+}
+@media (max-width:540px){
+  .paths{grid-template-columns:1fr}
+  .tbl td:first-child{min-width:12rem}
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#"><span class="sig">§</span>esbirka-skill <small>v1.1.0</small></a>
+    <nav class="top" aria-label="Sekce">
+      <ul>
+        <li><a href="#umi">Co umí</a></li>
+        <li><a href="#zneni">Časová znění</a></li>
+        <li><a href="#instalace">Instalace</a></li>
+        <li><a href="#cesty">Zdroje dat</a></li>
+        <li><a href="#agenti">Pro agenty</a></li>
+        <li><a href="#prikazy">Příkazy</a></li>
+      </ul>
+    </nav>
+    <a class="gh" href="https://github.com/LexaurinTheDog/esbirka-skill"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>GitHub</a>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap">
+    <div>
+      <p class="eyebrow">Skill pro Claude Code · Codex · Agent Skills</p>
+      <h1 style="margin-top:.6rem">Zákony a jejich časová znění z oficiální e&#8209;Sbírky, přímo v&nbsp;kódovacím agentovi.</h1>
+      <p class="lead">Agent se zeptá e-Sbírky, jak zněl paragraf k rozhodnému dni, které znění platilo, co změnila novela a čím byl předpis zrušen. Odpoví doslovným textem a přesnou citací znění. Jeden skript v Pythonu, bez závislostí.</p>
+      <p class="abstract">An agent skill for querying the official Czech legislation portal e-Sbírka: find an act, list its time versions, read a section as in force on a given date, diff two versions, list amendments. Works with or without an API key.</p>
+      <div class="install">
+        <div class="cmd"><span class="p">$</span><code>npx skills add LexaurinTheDog/esbirka-skill -g -y</code><button class="copy" data-copy="npx skills add LexaurinTheDog/esbirka-skill -g -y">Kopírovat</button></div>
+        <div class="cmd"><span class="p">/</span><code>plugin marketplace add LexaurinTheDog/esbirka-skill</code><button class="copy" data-copy="/plugin marketplace add LexaurinTheDog/esbirka-skill">Kopírovat</button></div>
+      </div>
+      <div class="hero-meta">
+        <span><b>MIT</b> licence</span>
+        <span><b>Python 3.9+</b>, jen standardní knihovna</span>
+        <span><b>27</b> živých testů v CI</span>
+      </div>
+    </div>
+    <div class="term" aria-label="Ukázka výstupu">
+      <div class="bar"><i></i><i></i><i></i>&nbsp;esbirka par 89/2012 "§ 2079" --k 1.5.2020</div>
+<pre><span class="c">$</span> <span class="k">esbirka</span> par 89/2012 <span class="q">"§ 2079"</span> --k 1.5.2020
+<span class="h">Zákon č. 89/2012 Sb., občanský zákoník</span>
+<span class="g">minulé znění, účinné od 1. 12. 2018 do 30. 6. 2020</span>  (staleUrl /sb/2012/89/2018-12-01)
+novely tohoto znění: 171/2018 Sb.
+
+§ 2079 zákona č. 89/2012 Sb. — Základní ustanovení
+
+<span class="h">### § 2079</span>
+<span class="q">**Základní ustanovení**</span>
+(1) Kupní smlouvou se prodávající zavazuje, že kupujícímu odevzdá
+    věc, která je předmětem koupě, a umožní mu nabýt vlastnické
+    právo k ní, a kupující se zavazuje, že věc převezme a zaplatí
+    prodávajícímu kupní cenu.
+(2) Neplyne-li ze smlouvy nebo zvyklostí něco jiného, jsou
+    prodávající a kupující zavázáni splnit své povinnosti současně.</pre>
+    </div>
+  </div>
+</section>
+
+<section class="part" id="umi">
+  <div class="wrap">
+    <aside class="margin">
+      <p class="eyebrow">Část první</p>
+      <h2>Co skill umí</h2>
+      <p>Otázky, které právník klade denně, a příkaz, kterým je agent zodpoví.</p>
+    </aside>
+    <div class="body">
+      <div class="sec">
+        <p class="num">§ 1 &nbsp;Otázka a příkaz</p>
+        <div class="tbl"><table>
+          <thead><tr><th>Otázka</th><th>Příkaz</th></tr></thead>
+          <tbody>
+            <tr><td>Jak zněl § 2079 občanského zákoníku k 1. 5. 2020?</td><td><code>esbirka par 89/2012 "§ 2079" --k 1.5.2020</code></td></tr>
+            <tr><td>Které znění insolvenčního zákona platilo 1. 6. 2019 a jaká novela ho založila?</td><td><code>esbirka info 182/2006 --k 1.6.2019</code></td></tr>
+            <tr><td>Kolik znění má zákon a kdy začne platit budoucí?</td><td><code>esbirka zneni 182/2006</code></td></tr>
+            <tr><td>Co se změnilo v § 757 OZ mezi 1. 7. 2025 a 1. 1. 2026?</td><td><code>esbirka diff 89/2012 --z 2025-07-01 --k 2026-01-01 --par "§ 757"</code></td></tr>
+            <tr><td>Které předpisy novelizují zákon o advokacii?</td><td><code>esbirka souvislosti 85/1996 --typ JE_MENEN</code></td></tr>
+            <tr><td>Čím byl zrušen starý občanský zákoník?</td><td><code>esbirka info 40/1964</code></td></tr>
+            <tr><td>Jak se jmenuje zákon č. 250/2016 Sb.?</td><td><code>esbirka search "250/2016"</code></td></tr>
+          </tbody>
+        </table></div>
+      </div>
+      <div class="sec">
+        <p class="num">§ 2 &nbsp;Odpověď s citací</p>
+        <p>Každý výstup nese hlavičku znění: úplnou citaci předpisu, typ znění, interval účinnosti a novely, které znění založily. Agent z ní skládá citaci, kterou lze vložit do podání:</p>
+        <div class="cite">„§ 108 odst. 1 zákona č. 182/2006 Sb., insolvenční zákon, ve znění účinném od 1. 6. 2019 do 30. 9. 2019 (novela č. 31/2019 Sb.)“<small>vzor citace z AGENTS.md</small></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="part" id="zneni">
+  <div class="wrap">
+    <aside class="margin">
+      <p class="eyebrow">Část druhá</p>
+      <h2>Časová znění</h2>
+      <p>Rozhodné je znění účinné v den skutečnosti, ne to dnešní. Skill to bere za své.</p>
+    </aside>
+    <div class="body">
+      <div class="sec">
+        <p class="num">§ 3 &nbsp;Datum ve staleUrl</p>
+        <p>E-Sbírka označuje znění identifikátorem <code>/sb/2012/89/2020-05-01</code>. Datum znamená <strong>znění účinné k tomuto dni</strong>; server je sám převede na počátek příslušného znění. Skill přijímá datum ve tvaru <code>2020-05-01</code> i <code>1. 5. 2020</code> a předpis jako <code>89/2012</code>, <code>89/2012 Sb.</code> nebo <code>6/2021 Sb. m. s.</code></p>
+      </div>
+      <div class="sec">
+        <p class="num">§ 4 &nbsp;Občanský zákoník ve 19 zněních</p>
+        <div class="tl" id="tl">
+          <div class="cap"><b>Zákon č. 89/2012 Sb. – znění č. 2 až 19</b><span>skutečná data z <code>esbirka zneni 89/2012</code>, 5. 9. 2026 · najeďte na úsek</span></div>
+          <div class="track" id="track" role="list" aria-label="Časová znění občanského zákoníku"></div>
+          <div class="axis"><span>2014</span><span>2016</span><span>2018</span><span>2020</span><span>2022</span><span>2024</span><span>2026</span></div>
+          <p class="info" id="tlinfo"></p>
+        </div>
+        <p class="note">Znění č. 1 (vyhlášené 22. 3. 2012, účinné až od 1. 1. 2014) v ose není. Krátké úseky, například jednodenní znění č. 11 z 5. 1. 2023, jsou přesně ten důvod, proč se na datum nemá hádat.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="part" id="instalace">
+  <div class="wrap">
+    <aside class="margin">
+      <p class="eyebrow">Část třetí</p>
+      <h2>Instalace</h2>
+      <p>Standardní rozvržení Agent Skills: složka se souborem SKILL.md a skriptem.</p>
+    </aside>
+    <div class="body">
+      <div class="sec">
+        <p class="num">§ 5 &nbsp;Podle agenta</p>
+        <div class="tabs" id="tabs">
+          <div role="tablist" aria-label="Způsob instalace">
+            <button role="tab" aria-selected="true" aria-controls="t-claude" id="tab-claude">Claude Code</button>
+            <button role="tab" aria-selected="false" aria-controls="t-codex" id="tab-codex" tabindex="-1">Codex CLI</button>
+            <button role="tab" aria-selected="false" aria-controls="t-skills" id="tab-skills" tabindex="-1">npx skills</button>
+            <button role="tab" aria-selected="false" aria-controls="t-manual" id="tab-manual" tabindex="-1">Ručně / projekt</button>
+          </div>
+          <div role="tabpanel" id="t-claude" aria-labelledby="tab-claude">
+            <p>Jako plugin: skill se zaregistruje sám a aktualizuje přes správce pluginů.</p>
+            <div class="cmd"><span class="p">/</span><code>plugin marketplace add LexaurinTheDog/esbirka-skill</code><button class="copy" data-copy="/plugin marketplace add LexaurinTheDog/esbirka-skill">Kopírovat</button></div>
+            <div class="cmd"><span class="p">/</span><code>plugin install esbirka@esbirka-skill</code><button class="copy" data-copy="/plugin install esbirka@esbirka-skill">Kopírovat</button></div>
+            <p>Nebo do <code>~/.claude/skills/esbirka</code> instalátorem:</p>
+            <div class="cmd"><span class="p">$</span><code>git clone https://github.com/LexaurinTheDog/esbirka-skill.git &amp;&amp; cd esbirka-skill &amp;&amp; ./install.sh</code><button class="copy" data-copy="git clone https://github.com/LexaurinTheDog/esbirka-skill.git && cd esbirka-skill && ./install.sh">Kopírovat</button></div>
+          </div>
+          <div role="tabpanel" id="t-codex" aria-labelledby="tab-codex" hidden>
+            <p>Instalátor zkopíruje skill do <code>~/.codex/skills/esbirka</code> a vytvoří příkaz <code>esbirka</code> v <code>~/.local/bin</code>.</p>
+            <div class="cmd"><span class="p">$</span><code>git clone https://github.com/LexaurinTheDog/esbirka-skill.git &amp;&amp; cd esbirka-skill &amp;&amp; ./install.sh --codex</code><button class="copy" data-copy="git clone https://github.com/LexaurinTheDog/esbirka-skill.git && cd esbirka-skill && ./install.sh --codex">Kopírovat</button></div>
+            <p>Metadata pro Codex jsou v <code>skills/esbirka/agents/openai.yaml</code>.</p>
+          </div>
+          <div role="tabpanel" id="t-skills" aria-labelledby="tab-skills" hidden>
+            <p>Univerzální CLI pro Agent Skills. Agenty rozpozná sám; cíl lze určit přepínači <code>-a claude-code -a codex -a cursor</code>.</p>
+            <div class="cmd"><span class="p">$</span><code>npx skills add LexaurinTheDog/esbirka-skill -g -y</code><button class="copy" data-copy="npx skills add LexaurinTheDog/esbirka-skill -g -y">Kopírovat</button></div>
+            <p>Ověřeno v čistém prostředí: skill se nainstaluje do <code>~/.claude/skills</code> a společného <code>~/.agents/skills</code>.</p>
+          </div>
+          <div role="tabpanel" id="t-manual" aria-labelledby="tab-manual" hidden>
+            <p>Do libovolného adresáře, například do projektu, nebo do všech podporovaných míst najednou.</p>
+            <div class="cmd"><span class="p">$</span><code>./install.sh --dir .claude/skills</code><button class="copy" data-copy="./install.sh --dir .claude/skills">Kopírovat</button></div>
+            <div class="cmd"><span class="p">$</span><code>./install.sh --all --browser</code><button class="copy" data-copy="./install.sh --all --browser">Kopírovat</button></div>
+            <p><code>--browser</code> navíc připraví záložní režim přes headless prohlížeč. <code>--check</code> jen zkontroluje stav.</p>
+          </div>
+        </div>
+      </div>
+      <div class="sec">
+        <p class="num">§ 6 &nbsp;API klíč</p>
+        <p>Klíč k registrovanému API přiděluje Ministerstvo vnitra na žádost datovou schránkou. Uloží se do <code>~/.claude/esbirka.env</code> jako <code>ESBIRKA_API_KEY=…</code> a posílá se v hlavičce <code>esel-api-access-key</code>, kterou dopis MV neuvádí. <strong>Bez klíče skill funguje také</strong>, přes veřejnou cache portálu se stejnými daty. Ověření: <code>esbirka diagnose</code>.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="part" id="cesty">
+  <div class="wrap">
+    <aside class="margin">
+      <p class="eyebrow">Část čtvrtá</p>
+      <h2>Zdroje dat</h2>
+      <p>Čtyři cesty k témuž textu. Skript mezi nimi přepíná sám.</p>
+    </aside>
+    <div class="body">
+      <div class="sec">
+        <p class="num">§ 7 &nbsp;Pořadí</p>
+        <div class="paths">
+          <div class="path"><b>API s klíčem</b><span>registrované REST rozhraní MV</span><code>api.e-sbirka.gov.cz</code></div>
+          <div class="path"><b>Cache portálu</b><span>bez klíče, stejné cesty a data</span><code>e-sbirka.gov.cz/sbr-cache</code></div>
+          <div class="path"><b>Prohlížeč</b><span>Chromium otevře portál a stejné dotazy pošle z jeho kontextu</span><code>--browser</code></div>
+          <div class="path"><b>Vykreslené stránky</b><span>čtení výsledků hledání a textu předpisu přímo z DOM</span><code>--ui</code></div>
+        </div>
+        <p class="note">Přepnutí spustí chyba spojení, HTTP 403/429/5xx nebo HTML místo JSON. Cesty 3 a 4 vyžadují Playwright, který se instaluje jednou příkazem <code>esbirka setup-browser</code> do izolovaného venv. Výstup z prohlížeče je označen <code>zdroj: portál (prohlížeč)</code>.</p>
+      </div>
+      <div class="sec">
+        <p class="num">§ 8 &nbsp;Co je pod tím</p>
+        <p>Skript volá rozhraní e-Sbírky: detail znění, historii, fragmenty textu po tisících, našeptávač ustanovení, rozdílové fragmenty, souvislosti a jednoduché vyhledávání. Katalog endpointů, filtrů a číselníků, ověřený živě, je v <a href="https://github.com/LexaurinTheDog/esbirka-skill/blob/main/skills/esbirka/reference/api.md">reference/api.md</a>. Oficiální dokumentace MV nebyla v době vzniku dostupná; katalog vznikl z funkční specifikace veřejného API a klienta portálu.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="part" id="agenti">
+  <div class="wrap">
+    <aside class="margin">
+      <p class="eyebrow">Část pátá</p>
+      <h2>Pro agenty</h2>
+      <p>SKILL.md říká kdy, AGENTS.md říká jak. Obojí je součástí instalace.</p>
+    </aside>
+    <div class="body">
+      <div class="sec">
+        <p class="num">§ 9 &nbsp;Rozhodovací strom</p>
+<pre class="tree">Znám číslo předpisu?
+├─ ne  → <b>search</b> "&lt;název nebo číslo&gt;" --pocet 5
+└─ ano → Je otázka časově určená?
+         ├─ ne  → <b>info</b> PŘEDPIS, pak <b>par</b> / <b>text</b>   (výslovně uvést: aktuální znění)
+         └─ ano → <b>info</b> PŘEDPIS --k DATUM → <b>par</b> … --k DATUM
+Otázka na změny?
+├─ „co se změnilo“          → <b>zneni</b> → <b>diff</b> --z D1 --k D2 [--par "§ N"]
+├─ „kdo novelizoval / ruší“ → <b>souvislosti</b> --typ JE_MENEN | JE_RUSEN | MENI | RUSI
+└─ „platí to ještě“         → <b>info</b> (datumZruseni) a <b>zneni</b> (BUDOUCI)</pre>
+      </div>
+      <div class="sec">
+        <p class="num">§ 10 &nbsp;Pravidla odpovědi</p>
+        <ol class="rules">
+          <li><span><b>Rozhodné datum je věcí právního posouzení.</b> Bez data agent odpoví pro aktuální znění a řekne to.</span></li>
+          <li><span><b>Interval účinnosti vždy.</b> Znění „od – do“ a novela, která je založila.</span></li>
+          <li><span><b>Text doslova.</b> Cituje výstup, výklad odděluje.</span></li>
+          <li><span><b>Budoucí znění a nezapracované novely</b> jsou součástí odpovědi, ne poznámky pod čarou.</span></li>
+          <li><span><b>Odkaz pro podání</b> je veřejná adresa portálu, například <code>https://e-sbirka.gov.cz/sb/2012/89/2026-01-01#par_2079</code>.</span></li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="part" id="prikazy">
+  <div class="wrap">
+    <aside class="margin">
+      <p class="eyebrow">Část šestá</p>
+      <h2>Přehled příkazů</h2>
+      <p>Každý má <code>--json</code>, texty i <code>--format md|text|html</code>.</p>
+    </aside>
+    <div class="body">
+      <div class="tbl"><table class="ref">
+        <thead><tr><th>Příkaz</th><th>Co dělá</th><th>Volby</th></tr></thead>
+        <tbody>
+          <tr><td><code>search DOTAZ</code></td><td>fulltextové vyhledání předpisů, nálezů ÚS, sdělení a smluv</td><td><code>--pocet --start</code></td></tr>
+          <tr><td><code>info PŘEDPIS</code></td><td>metadata znění: citace, interval účinnosti, novely, zrušení, částka</td><td><code>--k DATUM</code></td></tr>
+          <tr><td><code>zneni PŘEDPIS</code></td><td>historie všech časových znění včetně budoucích</td><td></td></tr>
+          <tr><td><code>obsah PŘEDPIS</code></td><td>systematika: části, hlavy, díly s rozsahem paragrafů</td><td><code>--k --uzel ID</code></td></tr>
+          <tr><td><code>par PŘEDPIS "§ N"</code></td><td>text ustanovení včetně odstavců a písmen</td><td><code>--k --format</code></td></tr>
+          <tr><td><code>text PŘEDPIS</code></td><td>celý text znění nebo souvislý rozsah</td><td><code>--od --do --k</code></td></tr>
+          <tr><td><code>diff PŘEDPIS --z D1 --k D2</code></td><td>rozdíly mezi zněními, vložený a vypuštěný text vyznačen</td><td><code>--par "§ N"</code></td></tr>
+          <tr><td><code>souvislosti PŘEDPIS</code></td><td>novelizuje, je novelizován, ruší, je rušen, provádí, nálezy ÚS</td><td><code>--typ --limit</code></td></tr>
+          <tr><td><code>castka sb ROK ČÍSLO</code></td><td>metadata částky a odkaz na právně závazné PDF</td><td></td></tr>
+          <tr><td><code>raw GET|POST CESTA</code></td><td>libovolný endpoint podle reference/api.md</td><td></td></tr>
+          <tr><td><code>diagnose</code></td><td>klíč, hlavička, dostupnost, Playwright</td><td></td></tr>
+          <tr><td><code>setup-browser</code></td><td>Playwright a Chromium pro záložní režim</td><td></td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+</section>
+
+<section class="part final">
+  <div class="wrap">
+    <aside class="margin">
+      <p class="eyebrow">Část sedmá</p>
+      <h2>Závěrečná ustanovení</h2>
+    </aside>
+    <div class="body">
+      <div class="sec">
+        <p class="num">§ 11 &nbsp;Právní upozornění</p>
+        <p>Konsolidovaná znění v e-Sbírce jsou úřední konsolidací Ministerstva vnitra a podle podmínek užití API jsou informativní. Právně závazné je vyhlášené znění v částce Sbírky; příkaz <code>castka</code> vrací odkaz na podepsané PDF. Projekt není dílem Ministerstva vnitra ani s ním není spojen. Výstupy nejsou právní službou; před použitím v podání je ověřte.</p>
+      </div>
+      <div class="sec">
+        <p class="num">§ 12 &nbsp;Licence a přispívání</p>
+        <p>Kód je pod licencí MIT. Chyby a návrhy patří do <a href="https://github.com/LexaurinTheDog/esbirka-skill/issues">Issues</a>. Pravidla: žádné klíče ani osobní údaje v kódu a příkladech; každou změnu chování ověřit živě proti e-Sbírce; CI kontroluje kompilaci, instalaci do čistého prostředí, 27 živých dotazů a nepřítomnost klíčů.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>esbirka-skill · <a href="https://github.com/LexaurinTheDog/esbirka-skill">github.com/LexaurinTheDog/esbirka-skill</a></span>
+    <span>Data: <a href="https://e-sbirka.gov.cz">e-Sbírka</a>, Ministerstvo vnitra ČR · Podpora API: esel@spcss.cz</span>
+  </div>
+</footer>
+
+<script>
+(function(){
+  // kopírování příkazů
+  document.querySelectorAll('button.copy').forEach(function(b){
+    b.addEventListener('click',function(){
+      var t=b.getAttribute('data-copy'); var done=function(){b.textContent='Zkopírováno';setTimeout(function(){b.textContent='Kopírovat';},1400);};
+      if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,done);}else{done();}
+    });
+  });
+  // záložky instalace
+  var tabs=document.querySelectorAll('#tabs [role=tab]');
+  function select(tab){
+    tabs.forEach(function(t){var on=t===tab;t.setAttribute('aria-selected',on?'true':'false');t.tabIndex=on?0:-1;document.getElementById(t.getAttribute('aria-controls')).hidden=!on;});
+    tab.focus();
+  }
+  tabs.forEach(function(t,i){
+    t.addEventListener('click',function(){select(t);});
+    t.addEventListener('keydown',function(e){
+      if(e.key==='ArrowRight'){select(tabs[(i+1)%tabs.length]);e.preventDefault();}
+      if(e.key==='ArrowLeft'){select(tabs[(i-1+tabs.length)%tabs.length]);e.preventDefault();}
+    });
+  });
+  // časová osa – skutečná znění zákona č. 89/2012 Sb. (esbirka zneni 89/2012, 5. 9. 2026)
+  var Z=[
+    [2,'2014-01-01','2016-12-29','MINULE',''],
+    [3,'2016-12-30','2017-02-27','MINULE','460/2016 Sb.'],
+    [4,'2017-02-28','2017-12-31','MINULE','460/2016 Sb.'],
+    [5,'2018-01-01','2018-06-30','MINULE','460/2016 Sb.'],
+    [6,'2018-07-01','2018-11-30','MINULE','111/2018 Sb.'],
+    [7,'2018-12-01','2020-06-30','MINULE','171/2018 Sb.'],
+    [8,'2020-07-01','2020-12-31','MINULE','163/2020 Sb.'],
+    [9,'2021-01-01','2021-06-30','MINULE','33/2020 Sb.'],
+    [10,'2021-07-01','2023-01-04','MINULE','192/2021 Sb.'],
+    [11,'2023-01-05','2023-01-05','MINULE','429/2022 Sb.'],
+    [12,'2023-01-06','2023-12-31','MINULE','374/2022 Sb., 429/2022 Sb.'],
+    [13,'2024-01-01','2024-03-31','MINULE','414/2023 Sb.'],
+    [14,'2024-04-01','2024-12-31','MINULE','31/2024 Sb.'],
+    [15,'2025-01-01','2025-02-14','MINULE','123/2024 Sb.'],
+    [16,'2025-02-15','2025-05-31','MINULE','32/2025 Sb.'],
+    [17,'2025-06-01','2025-06-30','MINULE','120/2025 Sb.'],
+    [18,'2025-07-01','2025-12-31','MINULE','144/2024 Sb., 78/2025 Sb.'],
+    [19,'2026-01-01','','AKTUALNI','176/2025 Sb., 268/2025 Sb., 270/2025 Sb., 290/2025 Sb., 333/2025 Sb.']
+  ];
+  var t0=Date.parse('2014-01-01'),t1=Date.parse('2027-01-01'),track=document.getElementById('track'),info=document.getElementById('tlinfo');
+  function cz(d){if(!d)return '…';var p=d.split('-');return (+p[2])+'. '+(+p[1])+'. '+p[0];}
+  function show(z){
+    info.innerHTML='<b>Znění č. '+z[0]+'</b> · '+(z[3]==='AKTUALNI'?'<em>aktuální</em>, účinné od '+cz(z[1]):'minulé, účinné od '+cz(z[1])+' do '+cz(z[2]))
+      +(z[4]?' · založily novely: '+z[4]:' · původní znění po nabytí účinnosti')+' · <code>/sb/2012/89/'+z[1]+'</code>';
+  }
+  var picked=Z[5]; // znění č. 7 (1. 12. 2018 – 30. 6. 2020) – totéž, které ukazuje příklad v záhlaví
+  Z.forEach(function(z){
+    var a=Date.parse(z[1]),b=z[2]?Date.parse(z[2])+864e5:t1;
+    var el=document.createElement('button');el.type='button';el.className='seg'+(z[3]==='AKTUALNI'?' now':'')+(z===picked?' pick':'');
+    el.style.flexGrow=String(Math.max(b-a,1));el.setAttribute('role','listitem');
+    el.setAttribute('aria-label','Znění č. '+z[0]+', účinné od '+cz(z[1])+(z[2]?' do '+cz(z[2]):''));
+    el.addEventListener('mouseenter',function(){show(z);});el.addEventListener('focus',function(){show(z);});
+    el.addEventListener('click',function(){track.querySelectorAll('.pick').forEach(function(p){p.classList.remove('pick');});el.classList.add('pick');picked=z;show(z);});
+    el.addEventListener('mouseleave',function(){show(picked);});
+    track.appendChild(el);
+  });
+  show(picked);
+})();
+</script>
+</body>
+</html>
