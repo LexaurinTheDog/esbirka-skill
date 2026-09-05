@@ -1,5 +1,7 @@
 # esbirka-skill — zákony a jejich časová znění z e-Sbírky pro kódovací agenty
 
+Web: **https://lexaurinthedog.github.io/esbirka-skill/**
+
 Skill pro **Claude Code, Codex CLI a další agenty podporující formát Agent Skills (`SKILL.md`)**, který
 odpovídá na otázky o českých právních předpisech přímo z **e-Sbírky**, oficiální elektronické Sbírky zákonů
 a mezinárodních smluv (Ministerstvo vnitra ČR). Jádrem je jeden skript v Pythonu bez závislostí.

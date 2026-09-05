@@ -1,7 +1,10 @@
 # Předání webové prezentace k nasazení
 
-Tento dokument je pro agenta (nebo člověka), který má stránku z této složky nasadit jako živý web.
-Autor stránky ji nenasazoval; vše potřebné je zde a v souboru `index.html`.
+Tento dokument popisuje nasazení stránky z této složky jako živého webu.
+
+**Stav: nasazeno 5. 9. 2026 na GitHub Pages** (větev `main`, složka `/docs`, HTTPS vynuceno):
+https://lexaurinthedog.github.io/esbirka-skill/ – každý push do `main` měnící `docs/` se nasadí automaticky.
+Níže zůstává postup pro případné přenesení jinam nebo na vlastní doménu.
 
 ## Co se předává
 
