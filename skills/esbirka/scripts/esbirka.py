@@ -41,8 +41,8 @@ import urllib.request
 
 def _env_file():
     """Umístění souboru s klíčem: $ESBIRKA_ENV, ~/.config/esbirka/esbirka.env, ~/.claude/esbirka.env, ~/.codex/esbirka.env."""
-    cands = [os.environ.get("ESBIRKA_ENV")] + [os.path.expanduser(p) for p in
-             ("~/.config/esbirka/esbirka.env", "~/.claude/esbirka.env", "~/.codex/esbirka.env")]
+    cands = [os.path.expanduser(os.environ["ESBIRKA_ENV"]) if os.environ.get("ESBIRKA_ENV") else None] + \
+            [os.path.expanduser(p) for p in ("~/.config/esbirka/esbirka.env", "~/.claude/esbirka.env", "~/.codex/esbirka.env")]
     for p in cands:
         if p and os.path.exists(p):
             return p

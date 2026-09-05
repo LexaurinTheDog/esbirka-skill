@@ -57,7 +57,8 @@ Skill je v adresáři `skills/esbirka/` ve standardním rozvržení Agent Skills
 `reference/`). Použijte instalátor skillů vašeho agenta, nebo:
 
 ```bash
-npx skills add LexaurinTheDog/esbirka-skill          # univerzální CLI pro Agent Skills
+npx skills add LexaurinTheDog/esbirka-skill -g -y    # univerzální CLI pro Agent Skills (agenty rozpozná sám;
+                                                     #  cíl lze určit: -a claude-code -a codex -a cursor …)
 ./install.sh --agents                                # → ~/.agents/skills/esbirka
 ./install.sh --dir .claude/skills                    # do konkrétního projektu
 ./install.sh --all                                   # Claude + Codex + ~/.agents
