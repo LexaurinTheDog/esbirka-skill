@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.9", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Kompilace a nápověda
+        run: |
+          python -m py_compile skills/esbirka/scripts/esbirka.py
+          python skills/esbirka/scripts/esbirka.py --help
+      - name: Instalace do dočasného HOME
+        run: |
+          export HOME="$RUNNER_TEMP/home"; mkdir -p "$HOME"
+          ./install.sh --all
+          ./install.sh --check
+          test -f "$HOME/.claude/skills/esbirka/SKILL.md"
+          test -f "$HOME/.codex/skills/esbirka/SKILL.md"
+          test -x "$HOME/.local/bin/esbirka"
+      - name: Živý dotaz na veřejnou cache (bez klíče)
+        continue-on-error: true
+        run: |
+          python skills/esbirka/scripts/esbirka.py --verejne info 89/2012 | head -3
+          python skills/esbirka/scripts/esbirka.py --verejne par 89/2012 "§ 2079 odst. 2" --format text | tail -2
+      - name: Kontrola, že v repu není klíč
+        run: |
+          ! grep -rn -E "ESBIRKA_API_KEY=[A-Za-z0-9]{10,}" --include="*" . --exclude-dir=.git

@@ -1,0 +1,11 @@
+# Klíče a přihlašovací údaje – nikdy do gitu (šablona *.env.example se verzuje)
+*.env
+!*.env.example
+*credentials*
+*.pem
+*.key
+
+# Python / macOS
+__pycache__/
+*.pyc
+.DS_Store

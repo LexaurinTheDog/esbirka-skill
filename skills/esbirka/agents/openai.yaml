@@ -1,0 +1,5 @@
+interface:
+  display_name: "e-Sbírka"
+  short_description: "Zákony a jejich časová znění z oficiální e-Sbírky (text §, znění k datu, novely, srovnání)"
+policy:
+  allow_implicit_invocation: true

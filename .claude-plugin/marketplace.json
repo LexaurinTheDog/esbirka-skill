@@ -1,0 +1,21 @@
+{
+  "name": "esbirka-skill",
+  "owner": {
+    "name": "Vojtěch Říha",
+    "url": "https://github.com/LexaurinTheDog"
+  },
+  "metadata": {
+    "description": "Skill e-Sbírka pro Claude Code: zákony a jejich časová znění z oficiální elektronické Sbírky zákonů ČR.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "esbirka",
+      "source": "./",
+      "description": "Zákony a jejich časová znění z e-Sbírky: vyhledání předpisu, znění k datu, text §, srovnání znění, novely a souvislosti.",
+      "version": "1.0.0",
+      "category": "legal",
+      "keywords": ["e-sbirka", "czech-law", "legislation"]
+    }
+  ]
+}
