@@ -5,7 +5,7 @@ set -u
 S="${1:-$(dirname "$0")/../skills/esbirka/scripts/esbirka.py}"
 pass=0; fail=0
 chk() { local label="$1" pat="$2"; shift 2
-  out=$(python3 "$S" "$@" 2>&1)
+  if [ "$label" = "výpadek→browser" ]; then out=$(ESBIRKA_BASE=https://127.0.0.1:9 ESBIRKA_PUBLIC_BASE=https://127.0.0.1:9 python3 "$S" "$@" 2>&1); else out=$(python3 "$S" "$@" 2>&1); fi
   if printf '%s' "$out" | grep -q -E "$pat"; then echo "PASS  $label"; pass=$((pass+1))
   else echo "FAIL  $label (očekáváno /$pat/)"; printf '%s\n' "$out" | tail -3; fail=$((fail+1)); fi; }
 
@@ -31,6 +31,17 @@ chk "raw POST"        "pocetCelkem"                             raw POST /jednod
 chk "chyba data"      "DOKUMENT_NENALEZEN"                      info 40/1964 --k 2026-01-01
 chk "json"            '"staleUrl"'                              info 89/2012 --json
 chk "diagnose"        "HTTP 200"                                diagnose
+
+if python3 -c 'import playwright' 2>/dev/null; then
+  echo "— prohlížeč (Playwright) —"
+  chk "ui search"       "85/1996 Sb\."                           --ui search "zákon o advokacii" --pocet 3
+  chk "ui par odst."    "^\(2\) Neplyne-li"                       --ui par 89/2012 "§ 2079 odst. 2" --format text
+  chk "ui par --k"      "1\. 12\. 2018 - 30\. 6\. 2020"          --ui par 89/2012 "§ 2079" --k 1.5.2020
+  chk "browser info"    "1\. 6\. 2019 do 30\. 9\. 2019"           --browser info 182/2006 --k 1.6.2019
+  chk "výpadek→browser" "přepínám na dotazy z prohlížeče"        info 89/2012
+else
+  echo "— prohlížeč (Playwright) není nainstalován, testy záložního režimu přeskočeny —"
+fi
 
 echo; echo "Výsledek: $pass PASS, $fail FAIL"
 [ "$fail" -eq 0 ]

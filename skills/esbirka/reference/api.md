@@ -106,3 +106,15 @@ Stránkování všude `start` (offset) + `pocet`; fragmenty výjimečně `cisloS
 - `https://e-sbirka.gov.cz/leg-externi/legislativni-procesy/dokument/{dokumentBaseId}/ma-legislativni-procesy` – běžící legislativní proces (e-Legislativa).
 - `https://e-sbirka.gov.cz/souborove-sluzby/soubory/{dokumentId}` – stažení souboru; `…/verejne-pozadavky-dokumenty/pozadavky/{pozadavekId}` – stav asynchronního generování.
 - Open data (ELI dumpy): `https://opendata.eselpoint.gov.cz/esel-esb/{eli}`.
+
+## Portál (vykreslené stránky) – pro záložní režim `--ui`
+
+Struktura ověřena 9/2026 (`scripts/esbirka_browser.py`). Portál je Angular SPA; data si stahuje z `/sbr-cache`,
+takže fetch z kontextu stránky (`--browser`) vrací stejný JSON jako REST. Čtení DOM (`--ui`) nezávisí na cestách API.
+
+| Stránka | URL | Co číst |
+|---|---|---|
+| vyhledávání | `https://e-sbirka.gov.cz/vyhledavani?f=<text>` | řádky `tr.pravni-akt-row`: první `a[href^="/"]` = kód a staleUrl (bez `?f=`), druhý odkaz = název; štítek `esel-colorfull-pointy-box` s třídou `esbir-pravni-akt-platny-panel` / `-vyhlaseny-panel` / `-zruseny-panel` = stav; datum vyhlášení v textu řádku; počet „Zobrazeno N výsledků z M nalezených“; stránkování „Načíst dalších 20“ |
+| text znění | `https://e-sbirka.gov.cz/sb/ROK/CISLO[/DATUM]?zalozka=text#par_N` | `div.fragment-wrapper[data-fragment-id=f<id>]` v pořadí dokumentu (celý text, u OZ ~12 000 prvků, dokresluje se postupně); kotva zvýrazní ustanovení třídami `zvyrazneni-ustanoveni`, `-first`, `-last`; číslo § má vnitřní `div.type-paragraf` a třídu `nt-styl-03`, nadpis pod § `nt-styl-12-paragraf-nadpis-pod-po`, odstavce `nt-styl-16-styl-16`; hlavička znění v textu stránky: „Minulé znění 1. 12. 2018 - 30. 6. 2020 (171/2018 Sb.)“; `document.title` = „89/2012 Sb., 1. 12. 2018 - 30. 6. 2020, minulé znění, …“ |
+| kotvy ustanovení | `#par_2079`, `#par_2079-odst_2`, `#par_310-pism_c`, `#cl_10` | portál přesměruje datum ve staleUrl na počátek znění (`/2020-05-01` → `/2018-12-01`) |
+| záložky | `?zalozka=text` \| `souvislosti` \| `historie` \| `info` | jen `text` je skriptem čten |

@@ -30,7 +30,13 @@ find ~/.claude ~/.codex ~/.agents -path '*skills/esbirka/scripts/esbirka.py' 2>/
 
 Skript nepotřebuje žádné závislosti ani proměnné prostředí. Klíč čte z `~/.claude/esbirka.env`
 (alternativně `~/.config/esbirka/esbirka.env` nebo cesta v `$ESBIRKA_ENV`); není-li,
-běží proti veřejné cache portálu se stejnými daty. Nikdy klíč nevypisuj, neloguj ani nepřenášej jinam.
+běží proti veřejné cache portálu se stejnými daty.
+
+**Výpadek REST rozhraní** řeší skript sám: API → cache → headless prohlížeč (Playwright), který dotazy pošle
+z kontextu portálu, a nakonec čtení vykreslených stránek (`search`, `par`, `text`). Ruční volba: `--browser`
+(všechny příkazy přes prohlížeč) nebo `--ui` (čtení stránek). Playwright se instaluje jednou příkazem
+`esbirka setup-browser` do izolovaného venv; `esbirka diagnose` ukáže, zda je k dispozici. V režimu `--ui`
+nefunguje rozsah `--od/--do`, `diff`, `souvislosti` ani `zneni` (ty jdou přes `--browser`, tj. JSON z prohlížeče). Nikdy klíč nevypisuj, neloguj ani nepřenášej jinam.
 
 Každý příkaz umí strojově čitelný výstup: `--json` (search, info, zneni, obsah, diff, souvislosti, castka)
 nebo `--format json` (par, text). Pro odpověď člověku používej výchozí textový výstup, pro další zpracování JSON.
@@ -167,7 +173,9 @@ Typ znění: `aktuální`, `minulé`, `budoucí`, `vyhlášené`. Interval bez �
 | `Ustanovení '§ 5' v … nenalezeno` | špatné označení nebo ustanovení v tomto znění neexistuje | zkus `"čl. 5"`, ověř přes `obsah`, případně `text --od --do` sousedních § |
 | `e-Sbírka HTTP 401: NEPLATNY_API_KLIC` | klíč nebo hlavička | skript se sám přepne na veřejnou cache a pokračuje; uživateli doporuč `diagnose` |
 | `CHYBI_VSTUPNI_PARAMETR` (raw) | rozšířené vyhledávání vyžaduje `kontextVyhledavani` a další povinná pole | použij `search` (jednoduché vyhledávání) nebo doplň tělo podle `reference/api.md` |
-| `Chyba spojení` | síť / výpadek | opakuj s `--verejne`; pokud selže i to, řekni, že e-Sbírka je nedostupná, a nabídni neoficiální zdroj s výhradou |
+| `⚠ REST rozhraní nedostupné … přepínám na dotazy z prohlížeče` | API i cache neodpovídají, skript pokračuje přes Playwright | nic; v odpovědi zmiň, že data přišla z portálu přes prohlížeč (`zdroj: portál (prohlížeč)`) |
+| `e-Sbírka nedostupná … Záložní režim prohlížeče není k dispozici` | výpadek a Playwright není nainstalován | doporuč `esbirka setup-browser`; do té doby řekni, že e-Sbírka je nedostupná, a nabídni neoficiální zdroj s výhradou |
+| `e-Sbírka nedostupná i z prohlížeče` | portál sám je mimo provoz | opakuj později; neoficiální zdroj jen s výhradou |
 | dlouhý běh `par`/`text` | první stažení textu kodexu | normální (5–15 s), neopakuj volání paralelně |
 
 ## 8. Omezení

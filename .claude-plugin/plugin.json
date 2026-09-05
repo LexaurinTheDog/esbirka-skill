@@ -1,6 +1,6 @@
 {
   "name": "esbirka",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Zákony a jejich časová znění z oficiální e-Sbírky (api.e-sbirka.gov.cz): vyhledání předpisu, znění k datu, text §, srovnání znění, novely.",
   "author": {
     "name": "Vojtěch Říha",

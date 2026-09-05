@@ -36,6 +36,12 @@ Napevno lze způsob zadat řádkem `ESBIRKA_AUTH=header:esel-api-access-key` v e
 
 Skript používá pouze standardní knihovnu Pythonu 3 – žádné závislosti.
 
+**Když REST rozhraní nefunguje** (chyba spojení, 403/429/5xx, HTML místo JSON), skript se sám přepne na
+headless prohlížeč (Playwright): dotazy pošle z kontextu portálu e-sbirka.gov.cz, a selže-li i to, přečte
+vykreslené stránky (`search`, `par`, `text`). Vyžaduje jednorázově `esbirka setup-browser` (venv + Chromium).
+Ručně: `--browser` (všechny příkazy přes prohlížeč), `--ui` (čtení stránek). Výstup z prohlížeče nese
+označení `zdroj: portál (prohlížeč)` – v odpovědi uživateli to zmiň, data jsou stejná, jen cesta jiná.
+
 ## Identifikace předpisu
 
 Skript přijímá: `89/2012`, `89/2012 Sb.`, `č. 89/2012 Sb.`, `6/2021 Sb. m. s.`, `/sb/2012/89`,
@@ -67,6 +73,9 @@ $E souvislosti 182/2006 --typ JE_MENEN            # kdo novelizuje (MENI / JE_ME
 $E castka sb 2025 100                             # obsah částky
 $E raw GET "/dokumenty-sbirky/%2Fsb%2F2006%2F182/historie"        # libovolný endpoint (viz reference/api.md)
 $E raw POST /jednoducha-vyhledavani '{"fulltext":"nadace","start":0,"pocet":5}'
+$E setup-browser                                  # jednorázově: Playwright + Chromium pro záložní režim
+$E --ui search "zákon o advokacii"                # čtení výsledků přímo z portálu (když REST stojí)
+$E --ui par 85/1996 "§ 21" --k 1.1.2024            # text ustanovení z vykreslené stránky portálu
 ```
 
 Každý příkaz má `--json` (surová odpověď) nebo `--format json|html|text|md`; `-v` vypíše volané URL.

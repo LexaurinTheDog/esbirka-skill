@@ -78,6 +78,20 @@ SBIRKY = {"sb.": "sb", "sb": "sb", "sb. m. s.": "sm", "sb.m.s.": "sm", "sm": "sm
           "ú. l.": "ul0", "u.l.": "ul0"}
 
 
+class Nedostupne(Exception):
+    """REST rozhraní e-Sbírky neodpovídá (síť, 403/429/5xx, WAF) a záložní cesty selhaly."""
+
+
+def _browser_module():
+    """Lazy import sousedního esbirka_browser.py (Playwright); vrací modul nebo vyhodí Nedostupne s návodem."""
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import esbirka_browser  # noqa: F401
+        return esbirka_browser
+    except ImportError as e:
+        raise Nedostupne(f"Záložní režim prohlížeče není k dispozici ({e}).")
+
+
 # ───────────────────────── konfigurace ─────────────────────────
 
 def load_env():
@@ -115,14 +129,21 @@ def save_auth_memo(mode, name):
 
 
 class Client:
-    def __init__(self, base=None, verejne=False, verbose=False, no_cache=False):
+    def __init__(self, base=None, verejne=False, verbose=False, no_cache=False, transport=None, ui=False):
         cfg = load_env()
         self.key = cfg.get("ESBIRKA_API_KEY")
         self.verbose = verbose
         self.no_cache = no_cache
         self.auth = None  # (mode, name)
-        if verejne or (not self.key and not base and not cfg.get("ESBIRKA_BASE")):
-            self.base = PUBLIC_BASE
+        # transport: "http" (urllib) | "browser" (fetch z kontextu portálu přes Playwright); ui = číst vykreslené stránky
+        t = transport or os.environ.get("ESBIRKA_TRANSPORT") or "http"
+        self.ui = ui or t == "ui"
+        self.transport = "browser" if t in ("browser", "ui") else "http"
+        self._browser = None
+        self._tried_cache = False
+        self.public_base = os.environ.get("ESBIRKA_PUBLIC_BASE", PUBLIC_BASE)  # jen pro testy výpadku
+        if verejne or self.transport == "browser" or (not self.key and not base and not cfg.get("ESBIRKA_BASE")):
+            self.base = self.public_base
             self.key = None
         else:
             self.base = (base or cfg.get("ESBIRKA_BASE") or API_BASE).rstrip("/")
@@ -154,17 +175,61 @@ class Client:
         data = json.dumps(body, ensure_ascii=False).encode("utf-8") if body is not None else None
         return urllib.request.Request(url, data=data, headers=headers, method=method)
 
+    # ── prohlížeč (Playwright) ──
+    def browser(self):
+        if self._browser is None:
+            mod = _browser_module()
+            try:
+                self._browser = mod.BrowserSession(verbose=self.verbose)
+            except mod.BrowserUnavailable as e:
+                raise Nedostupne(str(e))
+            except Exception as e:
+                raise Nedostupne(f"Prohlížeč se nepodařilo spustit: {e}")
+        return self._browser
+
+    def use_browser_transport(self, reason=""):
+        if self.transport == "browser":
+            return False
+        b = self.browser()  # může vyhodit Nedostupne
+        print(f"⚠ REST rozhraní nedostupné ({reason}) – přepínám na dotazy z prohlížeče (portál e-sbirka.gov.cz).", file=sys.stderr)
+        self.transport = "browser"
+        self.base, self.key, self.auth = PUBLIC_BASE, None, None
+        return b is not None
+
+    def close(self):
+        if self._browser:
+            self._browser.close()
+            self._browser = None
+
     def _do(self, req):
         if self.verbose:
             print(f"→ {req.get_method()} {req.full_url}", file=sys.stderr)
+        if self.transport == "browser":
+            body = json.loads(req.data.decode("utf-8")) if req.data else None
+            url = req.full_url
+            if url.startswith(API_BASE):
+                url = PUBLIC_BASE + url[len(API_BASE):]
+            try:
+                return self.browser().fetch_json(req.get_method(), url, body)
+            except Nedostupne:
+                raise
+            except Exception as e:
+                raise Nedostupne(f"fetch z prohlížeče selhal: {e}")
         try:
             with urllib.request.urlopen(req, timeout=60) as r:
                 raw = r.read()
                 return r.status, raw
         except urllib.error.HTTPError as e:
             return e.code, e.read()
-        except urllib.error.URLError as e:
-            raise SystemExit(f"Chyba spojení: {e.reason}")
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            raise Nedostupne(f"Chyba spojení: {getattr(e, 'reason', e)}")
+
+    def _looks_dead(self, status, raw):
+        """403/429/5xx nebo odpověď, která není JSON (typicky HTML stránka WAF / výpadku)."""
+        if status in (403, 429) or status >= 500:
+            return True
+        head = (raw or b"").lstrip()[:1]
+        return status < 400 and head not in (b"{", b"[") and raw not in (b"", None)
 
     def call(self, method, path, params=None, body=None, cache=False):
         """Vrátí dekódovaný JSON, nebo skončí s chybou. Při 401 s klíčem zkusí ostatní způsoby autentizace."""
@@ -174,7 +239,27 @@ class Client:
             if os.path.exists(ck) and time.time() - os.path.getmtime(ck) < CACHE_TTL:
                 with open(ck, encoding="utf-8") as fh:
                     return json.load(fh)
-        status, raw = self._do(self._build(method, path, params, body, self.auth))
+        # 1) primární cesta; při výpadku postupně: API → veřejná cache → prohlížeč (Playwright)
+        while True:
+            try:
+                status, raw = self._do(self._build(method, path, params, body, self.auth))
+                if not self._looks_dead(status, raw):
+                    break
+                reason = f"HTTP {status}"
+            except Nedostupne as e:
+                reason = str(e)
+            if self.transport == "http" and self.base != self.public_base and not self._tried_cache:
+                print(f"⚠ {self.base} nedostupné ({reason}) – zkouším veřejnou cache portálu.", file=sys.stderr)
+                self._tried_cache = True
+                self.base, self.key, self.auth = self.public_base, None, None
+                continue
+            if self.transport == "http":
+                try:
+                    self.use_browser_transport(reason)
+                    continue
+                except Nedostupne as e:
+                    raise Nedostupne(f"e-Sbírka nedostupná ({reason}). {e}")
+            raise Nedostupne(f"e-Sbírka nedostupná i z prohlížeče ({reason}).")
         if status == 401 and self.key and self.base == API_BASE:
             for cand in AUTH_CANDIDATES:
                 if cand == self.auth:
@@ -388,12 +473,29 @@ def head_info(d):
 
 # ───────────────────────── příkazy ─────────────────────────
 
+def _ui_fallback(c, e, what):
+    """Po selhání REST cesty zkusí čtení vykreslené stránky portálu; jinak chybu vyhodí dál."""
+    try:
+        b = c.browser()
+    except Nedostupne as e2:
+        raise Nedostupne(f"{e} {e2}")
+    print(f"⚠ {e} – čtu {what} z vykreslené stránky portálu.", file=sys.stderr)
+    return b
+
+
 def cmd_search(c, a):
     body = {"fulltext": a.dotaz, "start": a.start, "pocet": a.pocet}
-    d = c.call("POST", "/jednoducha-vyhledavani", body=body)
+    if c.ui:
+        d = c.browser().ui_search(a.dotaz, a.pocet)
+    else:
+        try:
+            d = c.call("POST", "/jednoducha-vyhledavani", body=body)
+        except Nedostupne as e:
+            d = _ui_fallback(c, e, "výsledky vyhledávání").ui_search(a.dotaz, a.pocet)
     if a.json:
         return print_json(d)
-    print(f"Nalezeno celkem: {d.get('pocetCelkem')}  (zobrazeno {a.start + 1}–{a.start + len(d.get('seznam', []))})")
+    print(f"Nalezeno celkem: {d.get('pocetCelkem')}  (zobrazeno {a.start + 1}–{a.start + len(d.get('seznam', []))})"
+          + (f"  [zdroj: {d['zdroj']}]" if d.get("zdroj") else ""))
     for r in d.get("seznam", []):
         print(f"- {r.get('kodDokumentuSbirky'):<22} {r.get('nazev')}  [{r.get('stavDokumentuSbirky')}, {cz_date(r.get('datum'))}]  {r.get('staleUrl')}")
 
@@ -459,12 +561,36 @@ def _resolve_par(c, su, text):
     return (exact or hits)[0], hits
 
 
+def _ui_print_text(c, su, ustanoveni, fmt):
+    """Text z vykreslené stránky portálu (režim --ui nebo záloha při výpadku REST)."""
+    mod = _browser_module()
+    q = (ustanoveni or "").strip()
+    if q and q[:1].isdigit():
+        q = "§ " + q
+    d = c.browser().ui_text(su, q or None)
+    if fmt == "json":
+        return print_json(d)
+    print(d.get("title", ""))
+    if d.get("hlavicka"):
+        print(d["hlavicka"] + f"  (staleUrl {d.get('staleUrl')}, zdroj: portál – prohlížeč)")
+    print()
+    if q and not d["radky"]:
+        raise SystemExit(f"Ustanovení {ustanoveni!r} se na stránce {d.get('url')} nepodařilo najít.")
+    print(mod.render_ui_text(d, fmt))
+
+
 def cmd_par(c, a):
     su = parse_predpis(a.predpis, a.k)
-    d = c.dok(su)
-    su = d.get("staleUrl", su)  # normalizace na konkrétní znění
-    hit, hits = _resolve_par(c, su, a.ustanoveni)
-    frags = all_fragments(c, su)
+    if c.ui:
+        return _ui_print_text(c, su, a.ustanoveni, a.format)
+    try:
+        d = c.dok(su)
+        su = d.get("staleUrl", su)  # normalizace na konkrétní znění
+        hit, hits = _resolve_par(c, su, a.ustanoveni)
+        frags = all_fragments(c, su)
+    except Nedostupne as e:
+        _ui_fallback(c, e, "text ustanovení")
+        return _ui_print_text(c, su, a.ustanoveni, a.format)
     sub = subtree(frags, hit["fragmentId"])
     if a.format != "json":
         print(head_info(d))
@@ -477,9 +603,17 @@ def cmd_par(c, a):
 
 def cmd_text(c, a):
     su = parse_predpis(a.predpis, a.k)
-    d = c.dok(su)
-    su = d.get("staleUrl", su)
-    frags = all_fragments(c, su)
+    if c.ui:
+        if a.od or a.do:
+            print("ℹ V režimu prohlížeče se rozsah --od/--do nepodporuje; vypisuji celé znění.", file=sys.stderr)
+        return _ui_print_text(c, su, None, a.format)
+    try:
+        d = c.dok(su)
+        su = d.get("staleUrl", su)
+        frags = all_fragments(c, su)
+    except Nedostupne as e:
+        _ui_fallback(c, e, "text znění")
+        return _ui_print_text(c, su, a.od, a.format) if (a.od and not a.do) else _ui_print_text(c, su, None, a.format)
     if a.od or a.do:
         ids = [f.get("id") for f in frags]
         i0, i1 = 0, len(frags)
@@ -585,7 +719,17 @@ def cmd_diagnose(c, a):
     cfg = load_env()
     print(f"env soubor: {ENV_FILE} {'(existuje)' if os.path.exists(ENV_FILE) else '(CHYBÍ)'}")
     print(f"klíč: {'nastaven (' + str(len(cfg.get('ESBIRKA_API_KEY', ''))) + ' znaků)' if cfg.get('ESBIRKA_API_KEY') else 'NENÍ – používá se veřejná cache portálu'}")
-    print(f"aktivní base: {c.base}")
+    print(f"aktivní base: {c.base}  (transport: {c.transport}{', ui' if c.ui else ''})")
+    try:
+        mod = _browser_module()
+        try:
+            mod.ensure_playwright()
+            print("prohlížeč (Playwright): k dispozici v tomto interpretu")
+        except mod.BrowserUnavailable:
+            print(f"prohlížeč (Playwright): NENÍ – záložní režim při výpadku API nebude fungovat; nainstalujte `esbirka setup-browser`"
+                  f" (venv {mod.VENV_DIR})")
+    except Nedostupne as e:
+        print(f"prohlížeč: {e}")
     if not cfg.get("ESBIRKA_API_KEY"):
         st, raw = c._do(c._build("GET", "/sbirky", None, None, None))
         print(f"veřejná cache: HTTP {st}  {raw[:80]!r}")
@@ -614,6 +758,8 @@ def main(argv=None):
     ap.add_argument("--verejne", action="store_true", help="vynutit veřejnou cache portálu (bez klíče)")
     ap.add_argument("-v", "--verbose", action="store_true")
     ap.add_argument("--no-cache", action="store_true", help="nepoužívat lokální cache stránek fragmentů")
+    ap.add_argument("--browser", action="store_true", help="posílat dotazy z headless prohlížeče (Playwright) místo přímého HTTP")
+    ap.add_argument("--ui", action="store_true", help="číst vykreslené stránky portálu (search, par, text); implikuje --browser")
     sp = ap.add_subparsers(dest="cmd", required=True)
 
     p = sp.add_parser("search", help="fulltextové vyhledání předpisů"); p.add_argument("dotaz")
@@ -652,9 +798,18 @@ def main(argv=None):
 
     p = sp.add_parser("diagnose", help="ověření klíče a způsobu autentizace"); p.set_defaults(fn=cmd_diagnose)
 
+    p = sp.add_parser("setup-browser", help="nainstaluje Playwright + Chromium do izolovaného venv pro záložní režim")
+    p.set_defaults(fn=lambda c, a: _browser_module().setup_browser())
+
     a = ap.parse_args(argv)
-    c = Client(base=a.base, verejne=a.verejne, verbose=a.verbose, no_cache=a.no_cache)
-    a.fn(c, a)
+    c = Client(base=a.base, verejne=a.verejne, verbose=a.verbose, no_cache=a.no_cache,
+               transport=("ui" if a.ui else "browser" if a.browser else None), ui=a.ui)
+    try:
+        a.fn(c, a)
+    except Nedostupne as e:
+        raise SystemExit(f"✗ {e}")
+    finally:
+        c.close()
 
 
 if __name__ == "__main__":

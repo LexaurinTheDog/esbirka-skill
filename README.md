@@ -91,6 +91,27 @@ neposkytuje podporu. Pro pravidelné použití si klíč vyřiďte.
 Podmínky užití API podle dopisu MV ve zkratce: klíč jen pro vlastní organizaci a účel z žádosti, nesdílet,
 nepřetěžovat API nad nahlášený počet volání, data jsou informativní a mohou se měnit.
 
+## Když API nefunguje: režim prohlížeče (Playwright)
+
+Skript má tři cesty k datům a přepíná mezi nimi sám:
+
+1. **API s klíčem** (`api.e-sbirka.gov.cz`),
+2. **veřejná cache portálu** (`e-sbirka.gov.cz/sbr-cache`),
+3. **headless prohlížeč**: Chromium otevře portál e-Sbírky a stejné dotazy posílá z jeho kontextu; pokud selže
+   i to, přečte přímo vykreslené stránky (vyhledávání `/vyhledavani?f=…`, text předpisu `/sb/…?zalozka=text#par_N`).
+
+Na třetí cestu se přepne při chybě spojení, HTTP 403/429/5xx nebo když místo JSON přijde HTML stránka
+(ochrana proti robotům, výpadek). Vyžaduje Playwright, který se instaluje jednorázově do izolovaného venv:
+
+```bash
+esbirka setup-browser        # ~/.local/share/esbirka/venv + Chromium (~150 MB); nebo ./install.sh --browser
+esbirka diagnose             # řádek „prohlížeč (Playwright): k dispozici“
+```
+
+Ruční volba cesty: `esbirka --browser <příkaz>` (dotazy z prohlížeče, všechny příkazy) a
+`esbirka --ui <příkaz>` (čtení vykreslených stránek; `search`, `par`, `text`). Výstup z prohlížeče je označen
+`zdroj: portál (prohlížeč)`. Bez Playwrightu skript při výpadku skončí srozumitelnou chybou s návodem.
+
 ## Příkazy
 
 | Příkaz | Co dělá | Důležité volby |
@@ -105,11 +126,13 @@ nepřetěžovat API nad nahlášený počet volání, data jsou informativní a 
 | `souvislosti PŘEDPIS` | novelizuje, je novelizován, ruší, je rušen, provádí, nálezy ÚS | `--typ`, `--limit` |
 | `castka SBÍRKA ROK ČÍSLO` | metadata částky a odkaz na právně závazné PDF | `--json` |
 | `raw GET/POST CESTA [JSON]` | libovolný endpoint (viz `skills/esbirka/reference/api.md`) | |
-| `diagnose` | ověření klíče, hlavičky a dostupnosti | |
+| `diagnose` | ověření klíče, hlavičky, dostupnosti a Playwrightu | |
+| `setup-browser` | instalace Playwright + Chromium do venv pro záložní režim prohlížeče | |
 
 Předpis: `89/2012`, `89/2012 Sb.`, `č. 89/2012 Sb.`, `6/2021 Sb. m. s.`, `/sb/2012/89`. Ustanovení: `"§ 2079"`,
 `"§ 2079 odst. 2"`, `"§ 310 písm. c)"`, `"čl. 10"` nebo jen `2079`. Datum: `2020-05-01` i `1. 5. 2020`;
-znamená znění účinné k tomuto dni. Globální přepínače: `--verejne` (vynutit cache portálu), `--no-cache`, `-v`.
+znamená znění účinné k tomuto dni. Globální přepínače: `--verejne` (vynutit cache portálu), `--browser`, `--ui`,
+`--no-cache`, `-v`.
 
 Ukázka (`esbirka info 40/1964 --k 2013-06-01`):
 
@@ -127,6 +150,7 @@ novely tohoto znění: 428/2011 Sb.
 | `skills/esbirka/SKILL.md` | instrukce pro agenta: kdy skill použít, postup, pravidla citace |
 | `skills/esbirka/AGENTS.md` | průvodce pro agenty: rozhodovací strom, recepty, tvar výstupů, chyby |
 | `skills/esbirka/scripts/esbirka.py` | CLI klient (Python 3.9+, pouze standardní knihovna) |
+| `skills/esbirka/scripts/esbirka_browser.py` | záložní režim přes headless prohlížeč (Playwright, volitelné) |
 | `skills/esbirka/reference/api.md` | katalog REST endpointů, filtrů a číselníků e-Sbírky |
 | `skills/esbirka/esbirka.env.example` | šablona souboru s klíčem |
 | `skills/esbirka/agents/openai.yaml` | metadata pro Codex |
@@ -154,7 +178,8 @@ specifikace veřejného API (registr smluv) a z klienta portálu a každý endpo
 | `400 DOKUMENT_NENALEZEN … /sb/1964/40/2026-01-01` | k datu předpis nebyl účinný; `esbirka zneni` ukáže platné intervaly |
 | `Ustanovení '§ 5' … nenalezeno` | předpis je členěn na články (`"čl. 5"`) nebo ustanovení v tomto znění neexistuje; `esbirka obsah` |
 | první `par`/`text` u kodexu trvá 5–15 s | stahuje se text po stránkách; další dotazy jdou z cache |
-| `Chyba spojení` | výpadek sítě nebo API; zkuste `--verejne` |
+| `Chyba spojení` / `e-Sbírka nedostupná` | výpadek sítě nebo API; skript se sám přepne na prohlížeč, je-li nainstalován (`esbirka setup-browser`); jinak zkuste `--verejne` nebo později |
+| `Záložní režim prohlížeče není k dispozici` | chybí Playwright: `esbirka setup-browser` (izolovaný venv), nebo `pip install playwright && python3 -m playwright install chromium` |
 
 ## Právní upozornění
 

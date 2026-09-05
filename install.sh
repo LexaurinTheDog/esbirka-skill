@@ -7,6 +7,7 @@
 #   ./install.sh --all           → všechny tři
 #   ./install.sh --dir CESTA     → libovolný adresář (např. .claude/skills v projektu)
 #   ./install.sh --check         → jen zkontroluje, nic nemění
+#   ./install.sh --browser       → navíc nainstaluje Playwright + Chromium (záložní režim při výpadku API)
 #
 # Vždy navíc vytvoří spouštěč `esbirka` v ~/.local/bin (přeskočit: --no-bin).
 # Klíč k API se NEinstaluje – patří do ~/.claude/esbirka.env, viz README.
@@ -14,7 +15,7 @@ set -uo pipefail
 
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/skills/esbirka"
 BIN_DIR="${ESBIRKA_BIN_DIR:-$HOME/.local/bin}"
-targets=(); check=0; bin=1
+targets=(); check=0; bin=1; browser=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --claude) targets+=("$HOME/.claude/skills/esbirka");;
@@ -24,7 +25,8 @@ while [ $# -gt 0 ]; do
     --dir)    shift; targets+=("${1%/}/esbirka");;
     --check)  check=1;;
     --no-bin) bin=0;;
-    -h|--help) sed -n '2,14p' "$0"; exit 0;;
+    --browser) browser=1;;
+    -h|--help) sed -n '2,15p' "$0"; exit 0;;
     *) echo "neznámý přepínač: $1" >&2; exit 2;;
   esac; shift
 done
@@ -80,6 +82,15 @@ if [ -n "$found" ]; then
   [ "$perm" = "600" ] || miss "doporučeno chmod 600 $found (nyní $perm)"
 else
   miss "bez klíče – skill použije veřejnou cache portálu; klíč: cp skills/esbirka/esbirka.env.example ~/.claude/esbirka.env"
+fi
+
+echo "▸ Záložní režim prohlížeče (Playwright)"
+if python3 -c 'import playwright' 2>/dev/null || [ -x "$HOME/.local/share/esbirka/venv/bin/python" ]; then
+  ok "Playwright k dispozici"
+elif [ "$browser" = 1 ] && [ "$check" = 0 ]; then
+  python3 "${targets[0]}/scripts/esbirka.py" setup-browser && ok "Playwright + Chromium nainstalován do ~/.local/share/esbirka/venv" || miss "instalace Playwrightu selhala"
+else
+  miss "Playwright chybí – při výpadku API nebude záložní režim; doinstalujte: esbirka setup-browser (nebo ./install.sh --browser)"
 fi
 
 if [ "$check" = 0 ]; then
