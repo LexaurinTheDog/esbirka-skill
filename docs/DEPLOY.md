@@ -51,7 +51,8 @@ Statický hosting bez buildu, kořenový adresář `docs/`:
 | Cloudflare Pages | Build command prázdný, Build output directory `docs` |
 | Netlify | Publish directory `docs`, žádný build; nebo `netlify deploy --prod --dir docs` |
 | Vercel | Framework „Other“, Output directory `docs`; nebo `vercel --prod docs` |
-| vlastní server | zkopírovat obsah `docs/` do webrootu; stačí libovolný HTTP server |
+| vlastní server (Apache) | `deploy/deploy-vps.sh <doména>` spuštěný na serveru jako root: naklonuje repozitář do `/var/www/<doména>`, vytvoří vhost s kořenem v `docs/`, zapne stránku a vyžádá certifikát Let's Encrypt. Aktualizace obsahu: `deploy/deploy-vps.sh <doména> --update` |
+| vlastní server (jiný) | zkopírovat obsah `docs/` do webrootu; stačí libovolný HTTP server, vzor konfigurace je v `deploy/apache-vhost.conf.example` |
 
 ## Vlastní doména (volitelné)
 

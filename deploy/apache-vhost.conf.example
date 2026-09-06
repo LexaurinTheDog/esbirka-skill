@@ -1,0 +1,45 @@
+# Apache vhost pro statickou prezentaci esbirka-skill.
+# Zástupné symboly nahradí deploy/deploy-vps.sh; ruční použití: zaměňte DOMAIN a WEBROOT.
+#
+#   DOMAIN   plný název, např. esbirka-skill.example.com
+#   WEBROOT  adresář se souborem index.html (u klonu repozitáře: /var/www/DOMAIN/docs)
+#
+# Po vytvoření:  a2ensite DOMAIN.conf && apache2ctl configtest && systemctl reload apache2
+# TLS certifikát: certbot --apache -d DOMAIN   (vhost pro :443 dopíše certbot sám)
+
+<VirtualHost *:80>
+    ServerName DOMAIN
+    DocumentRoot WEBROOT
+
+    <Directory WEBROOT>
+        Options -Indexes +FollowSymLinks
+        AllowOverride None
+        Require all granted
+    </Directory>
+
+    # Statická stránka bez PHP a bez zápisu; nic dalšího se nespouští.
+    <FilesMatch "\.(php|cgi|pl|py|sh)$">
+        Require all denied
+    </FilesMatch>
+
+    # Dlouhá platnost pro obrázky a písma, krátká pro HTML (aktualizace se projeví hned).
+    <IfModule mod_expires.c>
+        ExpiresActive On
+        ExpiresByType text/html "access plus 10 minutes"
+        ExpiresByType image/png "access plus 30 days"
+        ExpiresByType image/svg+xml "access plus 30 days"
+    </IfModule>
+
+    <IfModule mod_deflate.c>
+        AddOutputFilterByType DEFLATE text/html text/css application/javascript image/svg+xml
+    </IfModule>
+
+    <IfModule mod_headers.c>
+        Header always set X-Content-Type-Options "nosniff"
+        Header always set Referrer-Policy "strict-origin-when-cross-origin"
+        Header always set X-Frame-Options "SAMEORIGIN"
+    </IfModule>
+
+    ErrorLog  ${APACHE_LOG_DIR}/DOMAIN-error.log
+    CustomLog ${APACHE_LOG_DIR}/DOMAIN-access.log combined
+</VirtualHost>
