@@ -197,4 +197,8 @@ Chyby a návrhy vítány v Issues. Pravidla: žádné klíče ani osobní údaje
 každou změnu chování skriptu ověřte živě proti e-Sbírce a aktualizujte `reference/api.md`, pokud se
 rozhraní chová jinak, než je popsáno. CI kontroluje kompilaci, instalaci a nepřítomnost klíčů.
 
+## Podpora
+
+Pokud vám skill šetří čas, můžete mě [pozvat na kávu na Ko-fi](https://ko-fi.com/vojtechriha). ☕
+
 Licence: MIT.
