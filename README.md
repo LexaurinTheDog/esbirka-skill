@@ -199,6 +199,9 @@ rozhraní chová jinak, než je popsáno. CI kontroluje kompilaci, instalaci a n
 
 ## Podpora
 
-Pokud vám skill šetří čas, můžete mě [pozvat na kávu na Ko-fi](https://ko-fi.com/vojtechriha). ☕
+<a href="https://ko-fi.com/vojtechriha"><img src="docs/kofi-cup.png" alt="Ko-fi" height="28" align="left"></a>
+
+Pokud vám skill šetří čas, můžete mě [pozvat na kávu na Ko-fi](https://ko-fi.com/vojtechriha).
+<br clear="left">
 
 Licence: MIT.
