@@ -63,7 +63,7 @@ $E search "insolvenční zákon" --pocet 5          # fulltext → kód, název,
 $E info 182/2006                                  # metadata aktuálního znění + úplná citace s novelami
 $E info 182/2006 --k 1.5.2020                     # které znění bylo účinné k datu (od–do, novely)
 $E zneni 182/2006                                 # historie všech časových znění (minulá, aktuální, BUDOUCÍ)
-$E obsah 89/2012 [--uzel 645208419]               # systematika: části → hlavy → díly (rozbalení uzlem)
+$E obsah 89/2012 [--uzel ID]                     # systematika: části → hlavy → díly (ID uzlu z předchozího výpisu `uzel=…`; mění se se zněním)
 $E par 89/2012 "§ 2079"                           # text ustanovení (aktuální znění)
 $E par 89/2012 "§ 2079 odst. 2" --k 2020-05-01    # text odstavce ve znění k datu
 $E text 89/2012 --od "§ 2079" --do "§ 2084"       # souvislý rozsah ustanovení
@@ -98,7 +98,7 @@ Každý příkaz má `--json` (surová odpověď) nebo `--format json|html|text|
 
 ## Omezení a pasti
 
-- Konsolidovaná znění před rokem 2024 jsou informativní (úřední konsolidace MV); pro autentický text
+- Konsolidovaná znění jsou informativní (úřední konsolidace MV); právně závazné je vyhlášené znění. Pro autentický text
   novely použij vyhlášené znění částky (`castka`, `souvislosti --typ MENI`).
 - Fulltext `search` hledá i v nálezech ÚS, sděleních a mezinárodních smlouvách – filtruj podle kódu a stavu.
 - `nabidka-ustanoveni` (použitá v `par`) našeptává podle označení; u předpisů členěných na články zadej `"čl. 5"`.

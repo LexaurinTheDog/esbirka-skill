@@ -77,7 +77,7 @@ u předpisů členěných na články `"čl. 5"`.
 ### 4.2 Souvislý úsek (např. celý díl o kupní smlouvě)
 
 ```bash
-esbirka obsah 89/2012 --uzel 645208419      # najdi rozsah § v dílu
+esbirka obsah 89/2012 --uzel <ID>      # ID z výpisu `obsah` (uzel=…); najdi rozsah § v dílu
 esbirka text 89/2012 --od "§ 2079" --do "§ 2183" --format text
 ```
 

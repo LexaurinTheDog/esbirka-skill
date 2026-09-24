@@ -15,7 +15,8 @@ chk "info --k"        "1\. 6\. 2019 do 30\. 9\. 2019"           info 182/2006 --
 chk "info zrušený"    "ZRUŠEN k 1\. 1\. 2014"                   info 40/1964
 chk "zneni"           "AKTUÁLNÍ"                                zneni 182/2006
 chk "obsah"           "ČÁST PRVNÍ"                              obsah 182/2006
-chk "obsah --uzel"    "HLAVA I"                                 obsah 89/2012 --uzel 645208419
+UZEL=$(python3 "$S" obsah 89/2012 2>/dev/null | sed -n 's/.*uzel=\([0-9]*\).*/\1/p' | head -1)   # ID uzlů se mění se zněním
+chk "obsah --uzel"    "HLAVA I"                                 obsah 89/2012 --uzel "${UZEL:-0}"
 chk "par §"           "Kupní smlouvou se prodávající"           par 89/2012 "§ 2079" --format text
 chk "par holé číslo"  "Kupní smlouvou"                          par 89/2012 2079 --format text
 chk "par odst."       "^\(2\) Neplyne-li"                       par 89/2012 "§ 2079 odst. 2" --format text
