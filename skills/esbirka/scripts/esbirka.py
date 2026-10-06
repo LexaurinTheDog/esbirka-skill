@@ -316,9 +316,23 @@ class Client:
 
 # ───────────────────────── pomocné funkce ─────────────────────────
 
+MSYS_HINT = ("Git Bash (MSYS) na Windows přepsal argument začínající '/' na cestu k souboru ({!r}). "
+             "Zadejte cestu bez úvodního lomítka (např. jednoducha-vyhledavani), nebo spusťte s MSYS_NO_PATHCONV=1.")
+
+
+def _msys_mangled(s):
+    """Argument '/neco' přepsaný Git Bashem na 'C:/Program Files/Git/neco' – API cesta to být nemůže."""
+    return bool(re.match(r"^[A-Za-z]:[\\/]", s))
+
+
 def parse_predpis(s, datum=None):
     """'89/2012 Sb.' | '89/2012' | '6/2021 Sb. m. s.' | '/sb/2012/89[/datum]' → staleUrl."""
     s = s.strip()
+    if _msys_mangled(s):
+        m = re.search(r"[\\/]((?:sb|sm|ul0)[\\/]\d{4}[\\/]\d+(?:[\\/][\w-]+)?)[\\/]?$", s)
+        if not m:
+            raise SystemExit(MSYS_HINT.format(s))
+        s = "/" + m.group(1).replace("\\", "/")
     if s.startswith("/"):
         base = s
     else:
@@ -716,6 +730,8 @@ def cmd_castka(c, a):
 
 def cmd_raw(c, a):
     body = json.loads(a.body) if a.body else None
+    if _msys_mangled(a.cesta):
+        raise SystemExit(MSYS_HINT.format(a.cesta))
     d = c.call(a.metoda.upper(), a.cesta if a.cesta.startswith("/") else "/" + a.cesta, body=body)
     print_json(d)
 

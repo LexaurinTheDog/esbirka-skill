@@ -22,6 +22,7 @@ chk "par §"           "Kupní smlouvou se prodávající"           par 89/2012
 chk "par holé číslo"  "Kupní smlouvou"                          par 89/2012 2079 --format text
 chk "par odst."       "^\(2\) Neplyne-li"                       par 89/2012 "§ 2079 odst. 2" --format text
 chk "par --k minulé"  "od 1\. 12\. 2018 do 30\. 6\. 2020"       par 89/2012 "§ 2079" --k 1.5.2020
+chk "par staleUrl"    "Kupní smlouvou se prodávající"           par /sb/2012/89 "§ 2079" --format text   # Git Bash: /sb/… přepíše na C:/…
 chk "par čl."         "Vyhlášené mezinárodní smlouvy"           par 1/1993 "čl. 10" --format text
 chk "par čl. holé"    "Vyhlášené mezinárodní smlouvy"           par 1/1993 10 --format text
 chk "text --od --do"  "§ 2081"                                  text 89/2012 --od 2080 --do 2081 --format text
@@ -29,7 +30,7 @@ chk "diff"            "Změněných fragmentů: [1-9]"              diff 89/2012
 chk "souvislosti"     "JE_RUSEN"                                souvislosti 40/1964 --typ JE_RUSEN
 chk "castka"          "overena-zneni/"                          castka sb 2025 100
 chk "raw GET"         "historie"                                raw GET "/dokumenty-sbirky/%2Fsb%2F2012%2F89/historie"
-chk "raw POST"        "pocetCelkem"                             raw POST /jednoducha-vyhledavani '{"fulltext":"nadace","start":0,"pocet":2}'
+chk "raw POST"        "pocetCelkem"                             raw POST jednoducha-vyhledavani '{"fulltext":"nadace","start":0,"pocet":2}'
 chk "chyba data"      "DOKUMENT_NENALEZEN"                      info 40/1964 --k 2026-01-01
 chk "json"            '"staleUrl"'                              info 89/2012 --json
 chk "diagnose"        "HTTP 200"                                diagnose
