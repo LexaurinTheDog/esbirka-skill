@@ -78,7 +78,8 @@ for f in "${ESBIRKA_ENV:-}" "$HOME/.config/esbirka/esbirka.env" "$HOME/.claude/e
 done
 if [ -n "$found" ]; then
   ok "$found"
-  perm=$(stat -f '%Lp' "$found" 2>/dev/null || stat -c '%a' "$found" 2>/dev/null)
+  # GNU stat (Linux) první: `stat -f` tam neselže, ale vypíše stav souborového systému
+  perm=$(stat -c '%a' "$found" 2>/dev/null || stat -f '%Lp' "$found" 2>/dev/null)
   [ "$perm" = "600" ] || miss "doporučeno chmod 600 $found (nyní $perm)"
 else
   miss "bez klíče – skill použije veřejnou cache portálu; klíč: cp skills/esbirka/esbirka.env.example ~/.claude/esbirka.env"

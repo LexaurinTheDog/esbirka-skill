@@ -38,6 +38,25 @@ def venv_python():
     return None
 
 
+def _in_venv():
+    """Běží aktuální interpret už z venv ze `setup-browser`?"""
+    norm = lambda p: os.path.normcase(os.path.realpath(p))
+    return norm(sys.prefix) == norm(VENV_DIR)
+
+
+def playwright_status():
+    """Kde je Playwright k dispozici – bez znovuspuštění procesu (pro `diagnose`)."""
+    try:
+        import playwright  # noqa: F401
+        return "v tomto interpretu"
+    except ImportError:
+        pass
+    vp = venv_python()
+    if vp and subprocess.run([vp, "-c", "import playwright"], capture_output=True).returncode == 0:
+        return f"ve venv ({vp})"
+    return None
+
+
 def ensure_playwright():
     """Vrátí sync_playwright. Není-li modul v aktuálním interpretu, ale existuje venv ze `setup-browser`,
     znovu spustí celý příkaz interpretem z venv (jednou, hlídáno proměnnou ESBIRKA_REEXEC)."""
@@ -46,8 +65,15 @@ def ensure_playwright():
         return sync_playwright
     except ImportError:
         vp = venv_python()
-        if vp and not os.environ.get("ESBIRKA_REEXEC") and os.path.realpath(vp) != os.path.realpath(sys.executable):
+        # Porovnává se sys.prefix, ne cesta k interpretu: python ve venv bývá symlink na systémový
+        # (Linux, macOS), takže realpath obou cest vyjde stejně a venv by se nikdy nepoužil.
+        if vp and not os.environ.get("ESBIRKA_REEXEC") and not _in_venv():
             env = dict(os.environ, ESBIRKA_REEXEC="1", ESBIRKA_TRANSPORT=os.environ.get("ESBIRKA_TRANSPORT") or "browser")
+            if os.name == "nt":
+                # na Windows execve proces nenahradí – spustí nový a původní hned skončí, takže volající
+                # (agent, terminál) dostane prázdný výstup a kód 0; proto podproces a jeho návratový kód
+                sys.stdout.flush(); sys.stderr.flush()
+                sys.exit(subprocess.call([vp] + sys.argv, env=env))
             os.execve(vp, [vp] + sys.argv, env)
         raise BrowserUnavailable(
             "Modul playwright není k dispozici. Nainstalujte jej příkazem `esbirka setup-browser` "
@@ -172,6 +198,12 @@ class BrowserSession:
                 break
             last = n
             self.page.wait_for_timeout(500)
+        if ustanoveni:
+            # zvýraznění ustanovení z kotvy portál přidává až po vykreslení fragmentů
+            try:
+                self.page.wait_for_selector("div.fragment-wrapper.zvyrazneni-ustanoveni", timeout=15000)
+            except Exception:
+                pass  # záložní postup níže hledá ustanovení podle textu
         data = self.page.evaluate(
             """(ust) => {
                  const clean = s => s.replace(/\\s+/g, ' ').trim();

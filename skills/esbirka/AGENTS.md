@@ -186,7 +186,7 @@ Typ znění: `aktuální`, `minulé`, `budoucí`, `vyhlášené`. Interval bez �
 - Data API jsou podle podmínek MV informativní; právně závazné je vyhlášené znění v částce (PDF z `castka`).
 - Do 15. 1. 2027 může MV rozhraní měnit (příprava e-Legislativy). Při neznámé chybě zkontroluj `reference/api.md`
   proti aktuálnímu chování a aktualizuj dokumentaci.
-- Fulltext `search` neumí filtrovat podle data ani typu aktu; pro přesné filtry použij `raw POST /rozsirena-vyhledavani/pravni-akt-esbirka`.
+- Fulltext `search` neumí filtrovat podle data ani typu aktu; pro přesné filtry použij `raw POST rozsirena-vyhledavani/pravni-akt-esbirka`.
 - Fulltextové parametry u fragmentů (`fulltext*`) text nefiltrují, pouze zvýrazňují; skript proto ustanovení
   hledá přes `nabidka-ustanoveni` a hierarchii ELI.
 - Limity počtu volání nejsou zveřejněny; MV může klienta při zátěži odpojit. Neprocházej hromadně celé sbírky.

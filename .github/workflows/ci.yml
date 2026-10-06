@@ -58,3 +58,48 @@ jobs:
           S=skills/esbirka/scripts/esbirka.py
           ESBIRKA_BASE=https://127.0.0.1:9 ESBIRKA_PUBLIC_BASE=https://127.0.0.1:9 python $S info 89/2012
           ESBIRKA_BASE=https://127.0.0.1:9 ESBIRKA_PUBLIC_BASE=https://127.0.0.1:9 python $S search "insolvenční zákon" --pocet 2
+
+  # Linux, macOS, Windows: Playwright ve venv ze `setup-browser` (výchozí instalace) a znovuspuštění
+  # příkazu interpretem z venv. Python ve venv bývá symlink na systémový – regresní test, že se venv opravdu použije.
+  multiplatform:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      PYTHON: python
+      PYTHONIOENCODING: utf-8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Kompilace a nápověda
+        run: |
+          python -m py_compile skills/esbirka/scripts/esbirka.py skills/esbirka/scripts/esbirka_browser.py
+          python skills/esbirka/scripts/esbirka.py --help >/dev/null
+      - name: Instalace (install.sh) do dočasného HOME
+        if: runner.os != 'Windows'
+        run: |
+          export HOME="$RUNNER_TEMP/home"; mkdir -p "$HOME"
+          ./install.sh --all && ./install.sh --check
+          test -f "$HOME/.claude/skills/esbirka/SKILL.md" && test -x "$HOME/.local/bin/esbirka"
+      - name: setup-browser (Playwright + Chromium do venv)
+        run: python skills/esbirka/scripts/esbirka.py setup-browser
+      - name: Systémové knihovny pro Chromium (Linux)
+        if: runner.os == 'Linux'
+        run: ~/.local/share/esbirka/venv/bin/python -m playwright install-deps chromium
+      - name: Systémový Python bez Playwrightu najde venv
+        run: |
+          ! python -c 'import playwright' 2>/dev/null
+          out=$(python skills/esbirka/scripts/esbirka.py diagnose 2>&1 || true); echo "$out"
+          echo "$out" | grep -q "Playwright): k dispozici ve venv"
+          out=$(python skills/esbirka/scripts/esbirka.py --browser info 182/2006 --k 1.6.2019 2>&1 || true); echo "$out"
+          ! echo "$out" | grep -q "playwright není k dispozici"
+      - name: Kouřové testy proti živé e-Sbírce (včetně záložního režimu)
+        continue-on-error: true
+        run: tests/smoke.sh
