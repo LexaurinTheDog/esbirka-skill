@@ -142,7 +142,10 @@ class Client:
         self._browser = None
         self._tried_cache = False
         self.public_base = os.environ.get("ESBIRKA_PUBLIC_BASE", PUBLIC_BASE)  # jen pro testy výpadku
-        if verejne or self.transport == "browser" or (not self.key and not base and not cfg.get("ESBIRKA_BASE")):
+        if self.transport == "browser":
+            # stejně jako use_browser_transport: prohlížeč vždy na skutečný portál (ESBIRKA_PUBLIC_BASE je jen pro testy výpadku REST)
+            self.base, self.key = PUBLIC_BASE, None
+        elif verejne or (not self.key and not base and not cfg.get("ESBIRKA_BASE")):
             self.base = self.public_base
             self.key = None
         else:
@@ -190,8 +193,10 @@ class Client:
     def use_browser_transport(self, reason=""):
         if self.transport == "browser":
             return False
-        b = self.browser()  # může vyhodit Nedostupne
+        # hláška před spuštěním prohlížeče: při Playwrightu ve venv se proces v browser() znovu spustí (execve)
         print(f"⚠ REST rozhraní nedostupné ({reason}) – přepínám na dotazy z prohlížeče (portál e-sbirka.gov.cz).", file=sys.stderr)
+        sys.stderr.flush()
+        b = self.browser()  # může vyhodit Nedostupne
         self.transport = "browser"
         self.base, self.key, self.auth = PUBLIC_BASE, None, None
         return b is not None
@@ -722,10 +727,10 @@ def cmd_diagnose(c, a):
     print(f"aktivní base: {c.base}  (transport: {c.transport}{', ui' if c.ui else ''})")
     try:
         mod = _browser_module()
-        try:
-            mod.ensure_playwright()
-            print("prohlížeč (Playwright): k dispozici v tomto interpretu")
-        except mod.BrowserUnavailable:
+        kde = mod.playwright_status()
+        if kde:
+            print(f"prohlížeč (Playwright): k dispozici {kde}")
+        else:
             print(f"prohlížeč (Playwright): NENÍ – záložní režim při výpadku API nebude fungovat; nainstalujte `esbirka setup-browser`"
                   f" (venv {mod.VENV_DIR})")
     except Nedostupne as e:
