@@ -9,7 +9,8 @@ a mezinárodních smluv (Ministerstvo vnitra ČR). Jádrem je jeden skript v Pyt
 > **English summary.** An agent skill (Claude Code / Codex / any `SKILL.md`-compatible agent) for querying
 > the official Czech legislation portal e-Sbírka: find an act, list its time versions, get the text of a
 > section as in force on a given date, diff two versions, list amendments. Single dependency-free Python
-> script; works with or without an API key. Documentation is in Czech, as is the law it serves.
+> script; works with or without an API key and paces requests (about one per second, with retries).
+> Documentation is in Czech, as is the law it serves.
 
 Co umí:
 
@@ -93,6 +94,10 @@ neposkytuje podporu. Pro pravidelné použití si klíč vyřiďte.
 Podmínky užití API podle dopisu MV ve zkratce: klíč jen pro vlastní organizaci a účel z žádosti, nesdílet,
 nepřetěžovat API nad nahlášený počet volání, data jsou informativní a mohou se měnit.
 
+Číselný limit volání není veřejný (ověřeno 19. 10. 2026). Žádost o klíč se ptá na počet požadavků za sekundu
+a souběžných spojení; konkrétní strop přijde s klíčem. Skript mezi požadavky nechává mezeru **1 s**, drží jedno
+spojení a HTTP 429 i výpadek spojení sám zopakuje. Jinou mezeru nastavíte `ESBIRKA_MIN_INTERVAL` (sekundy, `0` tempo vypne).
+
 ## Když API nefunguje: režim prohlížeče (Playwright)
 
 Skript má tři cesty k datům a přepíná mezi nimi sám:
@@ -102,7 +107,7 @@ Skript má tři cesty k datům a přepíná mezi nimi sám:
 3. **headless prohlížeč**: Chromium otevře portál e-Sbírky a stejné dotazy posílá z jeho kontextu; pokud selže
    i to, přečte přímo vykreslené stránky (vyhledávání `/vyhledavani?f=…`, text předpisu `/sb/…?zalozka=text#par_N`).
 
-Na třetí cestu se přepne při chybě spojení, HTTP 403/429/5xx nebo když místo JSON přijde HTML stránka
+Na třetí cestu se přepne až po opakování, při chybě spojení, HTTP 403/429/5xx nebo když místo JSON přijde HTML stránka
 (ochrana proti robotům, výpadek). Vyžaduje Playwright, který se instaluje jednorázově do izolovaného venv:
 
 ```bash

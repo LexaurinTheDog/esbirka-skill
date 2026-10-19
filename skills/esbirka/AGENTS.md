@@ -32,7 +32,12 @@ Skript nepotřebuje žádné závislosti ani proměnné prostředí. Klíč čte
 (alternativně `~/.config/esbirka/esbirka.env` nebo cesta v `$ESBIRKA_ENV`); není-li,
 běží proti veřejné cache portálu se stejnými daty.
 
-**Výpadek REST rozhraní** řeší skript sám: API → cache → headless prohlížeč (Playwright), který dotazy pošle
+**Tempo.** Skript mezi HTTP požadavky čeká 1 s a drží jedno spojení, i když agent spustí víc procesů najednou.
+HTTP 429, 502–504 a chybu spojení opakuje sám (až třikrát). Příkazy `esbirka` proto pouštěj po jednom a při hlášce
+o opakování je nespouštěj znovu. `par` už obsahuje hlavičku znění, samostatné `info` před ním není potřeba.
+Mezeru mění `ESBIRKA_MIN_INTERVAL` (`0` tempo vypne).
+
+**Výpadek REST rozhraní** řeší skript sám, až po vyčerpání opakování: API → cache → headless prohlížeč (Playwright), který dotazy pošle
 z kontextu portálu, a nakonec čtení vykreslených stránek (`search`, `par`, `text`). Ruční volba: `--browser`
 (všechny příkazy přes prohlížeč) nebo `--ui` (čtení stránek). Playwright se instaluje jednou příkazem
 `esbirka setup-browser` do izolovaného venv; `esbirka diagnose` ukáže, zda je k dispozici. V režimu `--ui`
@@ -176,7 +181,8 @@ Typ znění: `aktuální`, `minulé`, `budoucí`, `vyhlášené`. Interval bez �
 | `⚠ REST rozhraní nedostupné … přepínám na dotazy z prohlížeče` | API i cache neodpovídají, skript pokračuje přes Playwright | nic; v odpovědi zmiň, že data přišla z portálu přes prohlížeč (`zdroj: portál (prohlížeč)`) |
 | `e-Sbírka nedostupná … Záložní režim prohlížeče není k dispozici` | výpadek a Playwright není nainstalován | doporuč `esbirka setup-browser`; do té doby řekni, že e-Sbírka je nedostupná, a nabídni neoficiální zdroj s výhradou |
 | `e-Sbírka nedostupná i z prohlížeče` | portál sám je mimo provoz | opakuj později; neoficiální zdroj jen s výhradou |
-| dlouhý běh `par`/`text` | první stažení textu kodexu | normální (5–15 s), neopakuj volání paralelně |
+| `⚠ e-Sbírka HTTP 429 – čekám … a opakuji` | požadavek přišel příliš brzy | nic; skript počká a dotaz zopakuje. Nepouštěj další `esbirka` souběžně |
+| dlouhý běh `par`/`text` | stránky fragmentů a mezera 1 s mezi požadavky | normální, nepouštěj volání paralelně |
 
 ## 8. Omezení
 
@@ -189,7 +195,9 @@ Typ znění: `aktuální`, `minulé`, `budoucí`, `vyhlášené`. Interval bez �
 - Fulltext `search` neumí filtrovat podle data ani typu aktu; pro přesné filtry použij `raw POST rozsirena-vyhledavani/pravni-akt-esbirka`.
 - Fulltextové parametry u fragmentů (`fulltext*`) text nefiltrují, pouze zvýrazňují; skript proto ustanovení
   hledá přes `nabidka-ustanoveni` a hierarchii ELI.
-- Limity počtu volání nejsou zveřejněny; MV může klienta při zátěži odpojit. Neprocházej hromadně celé sbírky.
+- Číselný limit volání není zveřejněn (ověřeno 19. 10. 2026: článek Použití REST API, žádost o registraci, příručka).
+  Žádost sbírá požadavky za sekundu a souběžná spojení; konkrétní strop je v dopise MV. Skript drží 1 s a jedno
+  spojení. MV může klienta při zátěži odpojit. Neprocházej hromadně celé sbírky.
 - Věcný rejstřík (CzechVoc), důvodové zprávy a výkladová stanoviska skript zatím nevypisuje; jsou dostupné přes `raw`.
 
 ## 9. Spolupráce s dalšími nástroji

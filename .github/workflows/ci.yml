@@ -19,6 +19,8 @@ jobs:
         run: |
           python -m py_compile skills/esbirka/scripts/esbirka.py
           python skills/esbirka/scripts/esbirka.py --help
+      - name: Jednotkové testy tempa a opakování
+        run: python -m unittest tests/test_pace.py
       - name: Instalace do dočasného HOME
         run: |
           export HOME="$RUNNER_TEMP/home"; mkdir -p "$HOME"
@@ -82,6 +84,7 @@ jobs:
         run: |
           python -m py_compile skills/esbirka/scripts/esbirka.py skills/esbirka/scripts/esbirka_browser.py
           python skills/esbirka/scripts/esbirka.py --help >/dev/null
+          python -m unittest tests/test_pace.py
       - name: Instalace (install.sh) do dočasného HOME
         if: runner.os != 'Windows'
         run: |

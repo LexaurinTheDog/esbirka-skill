@@ -24,6 +24,29 @@ Stránka `/api-dokumentace` na nové doméně vrací 404 (9/2026).
 Chyby mají jednotný tvar `{"chyby":[{"kod":"…","popis":"…","datumCasChyby":"…"}]}`:
 `NEPLATNY_API_KLIC`, `DOKUMENT_NENALEZEN`, `CHYBI_VSTUPNI_PARAMETR`, `CHYBNY_RETEZEC`, `OBECNA_CHYBA`.
 
+## Tempo volání (ověřeno 19. 10. 2026)
+
+Číselný limit **není zveřejněný**. Platí tyto veřejné zdroje:
+
+- Článek [Použití REST API](https://e-sbirka.gov.cz/restful-api)
+  (`GET /sbr-obecne/clanky/fixni/ESBIRKA/POUZITI_RESTFULL_API`, změna 23. 7. 2026): data se smí používat
+  „v souladu s danými technickými omezeními“. Registrace se posuzuje podle očekávaného počtu volání a špiček.
+  Konkrétní strop je až v podmínkách, které MV pošle s klíčem.
+- [Žádost o registraci](https://opendata.eselpoint.gov.cz/dokumentace/Zadost%20o%20registraci%20klienta%20verejneho%20REST%20API%20e-Sbirky%20a%20e-Legislativy.docx)
+  povinně sbírá maximální počet požadavků za sekundu, maximální počet souběžných připojení, rozpětí volání
+  během dne, počet volání za den a špičky.
+- [Příručka REST API](https://opendata.eselpoint.gov.cz/dokumentace/Prirucka_REST_API_e-Sbirka.pdf) a OpenAPI
+  `daver.json` kvótu nepopisují. U `vypisFragmenty` a detailu znění jen uvádějí velký vliv na rychlost.
+- Klient portálu (bundle `main-es2015`, 11. 9. 2026) chyby neopakuje hned: `genericRetryStrategy` má výchozí
+  `scalingDuration` 1000 ms a 2 opakování, některé služby 1500 ms.
+- Odpovědi `api.e-sbirka.gov.cz` ani `sbr-cache` v ověřeném volání neposílaly `Retry-After` ani `X-RateLimit-*`.
+
+Skript proto mezi starty HTTP požadavků nechává **1 s** a drží jedno probíhající spojení (zámek
+`~/.cache/esbirka/pace.lock`, sdílený mezi procesy). `ESBIRKA_MIN_INTERVAL` v env souboru nebo v prostředí
+mezeru přepíše (`0` tempo vypne; čárka i tečka v čísle). HTTP 429, 502, 503, 504 a chyba spojení se před
+přepnutím na cache a prohlížeč opakují ještě třikrát (odstup `Retry-After`, strop 60 s, jinak 1 s, 2 s, 4 s).
+400, 401 a 404 se neopakují. `par` a `text --do` nestahují stránky fragmentů za koncem hledaného podstromu.
+
 ## Identifikátory
 
 - **staleUrl** `/{sbirka}/{rok}/{cislo}` = předpis (server přesměruje na aktuální znění);

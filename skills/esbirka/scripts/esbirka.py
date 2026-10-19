@@ -38,6 +38,16 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from email.utils import parsedate_to_datetime
+
+try:
+    import fcntl
+except ImportError:  # Windows
+    fcntl = None
+try:
+    import msvcrt
+except ImportError:  # POSIX
+    msvcrt = None
 
 def _env_file():
     """Umístění souboru s klíčem: $ESBIRKA_ENV, ~/.config/esbirka/esbirka.env, ~/.claude/esbirka.env, ~/.codex/esbirka.env."""
@@ -55,6 +65,13 @@ API_BASE = "https://api.e-sbirka.gov.cz"
 PUBLIC_BASE = "https://e-sbirka.gov.cz/sbr-cache"
 UA = "esbirka-skill/1.0 (+https://github.com/LexaurinTheDog/esbirka-skill)"
 CACHE_TTL = 7 * 24 * 3600
+# Veřejná dokumentace číslo neudává (žádost o klíč sbírá „požadavky za sekundu“ a souběžná
+# spojení; klient portálu při chybě čeká 1 s a 2 s). Výchozí mezera je konzervativní.
+MIN_INTERVAL_DEFAULT = 1.0
+RETRY_STATUSES = (429, 502, 503, 504)
+MAX_RETRIES = 3  # další pokusy po prvním odeslání
+RETRY_BACKOFF = (1, 2, 4)
+RETRY_AFTER_CAP = 60
 
 # Způsob předání klíče: hlavička `esel-api-access-key` (ověřeno 9/2026). Ostatní varianty jsou záloha,
 # kdyby MV název změnilo – `diagnose` je projde a funkční si zapamatuje.
@@ -104,10 +121,77 @@ def load_env():
                     continue
                 k, v = line.split("=", 1)
                 cfg[k.strip()] = v.strip()
-    for k in ("ESBIRKA_API_KEY", "ESBIRKA_BASE", "ESBIRKA_AUTH"):
+    for k in ("ESBIRKA_API_KEY", "ESBIRKA_BASE", "ESBIRKA_AUTH", "ESBIRKA_MIN_INTERVAL"):
         if os.environ.get(k):
             cfg[k] = os.environ[k]
     return cfg
+
+
+def min_interval_from(cfg):
+    """Mezera mezi starty HTTP požadavků v sekundách. 0 tempo vypne. Nečíslo → výchozí 1 s."""
+    raw = (cfg or {}).get("ESBIRKA_MIN_INTERVAL")
+    if raw is None or str(raw).strip() == "":
+        return MIN_INTERVAL_DEFAULT
+    try:
+        return float(str(raw).strip().replace(",", "."))
+    except ValueError:
+        return MIN_INTERVAL_DEFAULT
+
+
+def _fmt_secs(delay):
+    if abs(delay - round(delay)) < 1e-6:
+        return str(int(round(delay)))
+    return f"{delay:.1f}"
+
+
+def _retry_delay(headers, attempt):
+    """Retry-After (sekundy nebo HTTP datum, strop 60 s), jinak 1 s, 2 s, 4 s."""
+    fallback = RETRY_BACKOFF[min(attempt, len(RETRY_BACKOFF) - 1)]
+    get = getattr(headers, "get", None)
+    ra = get("Retry-After") if get else None
+    if ra is None or str(ra).strip() == "":
+        return fallback
+    text = str(ra).strip()
+    try:
+        return min(max(float(text), 0.0), RETRY_AFTER_CAP)
+    except ValueError:
+        pass
+    try:
+        when = parsedate_to_datetime(text)
+    except (TypeError, ValueError, IndexError, OverflowError):
+        return fallback
+    if when is None:
+        return fallback
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=_dt.timezone.utc)
+    secs = (when - _dt.datetime.now(_dt.timezone.utc)).total_seconds()
+    return min(max(secs, 0.0), RETRY_AFTER_CAP)
+
+
+def _lock_fd(fd):
+    """Výhradní zámek souboru. fcntl na POSIX, msvcrt na Windows; drží se po dobu požadavku."""
+    if fcntl is not None:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        return
+    if msvcrt is not None:
+        os.lseek(fd, 0, os.SEEK_SET)
+        while True:
+            try:
+                msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+                return
+            except OSError:
+                time.sleep(0.05)
+
+
+def _unlock_fd(fd):
+    if fcntl is not None:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+    elif msvcrt is not None:
+        try:
+            os.lseek(fd, 0, os.SEEK_SET)
+            msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+        except OSError:
+            pass
 
 
 def auth_memo_path():
@@ -134,6 +218,8 @@ class Client:
         self.key = cfg.get("ESBIRKA_API_KEY")
         self.verbose = verbose
         self.no_cache = no_cache
+        self.min_interval = min_interval_from(cfg)
+        self._pace_fd = None
         self.auth = None  # (mode, name)
         # transport: "http" (urllib) | "browser" (fetch z kontextu portálu přes Playwright); ui = číst vykreslené stránky
         t = transport or os.environ.get("ESBIRKA_TRANSPORT") or "http"
@@ -202,9 +288,62 @@ class Client:
         return b is not None
 
     def close(self):
+        self._pace_exit()
         if self._browser:
             self._browser.close()
             self._browser = None
+
+    def _pace_enter(self):
+        """Jedno probíhající HTTP spojení a mezera mezi starty, sdílené mezi procesy."""
+        if self.min_interval <= 0:
+            return
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        fd = os.open(os.path.join(CACHE_DIR, "pace.lock"), os.O_CREAT | os.O_RDWR, 0o600)
+        locked = False
+        try:
+            if os.fstat(fd).st_size < 1:
+                os.write(fd, b"\0")
+            _lock_fd(fd)
+            locked = True
+            stamp = os.path.join(CACHE_DIR, "pace.ts")
+            last = 0.0
+            try:
+                with open(stamp, encoding="utf-8") as fh:
+                    last = float((fh.read() or "0").strip() or 0)
+            except (OSError, ValueError):
+                last = 0.0
+            now = time.time()
+            wait = self.min_interval - (now - last)
+            if wait > 0:
+                time.sleep(wait)
+                now = time.time()
+            with open(stamp, "w", encoding="utf-8") as fh:
+                fh.write(repr(now))
+            self._pace_fd = fd
+            fd = None
+        finally:
+            if fd is not None:
+                if locked:
+                    _unlock_fd(fd)
+                os.close(fd)
+
+    def _pace_exit(self):
+        fd = self._pace_fd
+        if fd is None:
+            return
+        self._pace_fd = None
+        try:
+            _unlock_fd(fd)
+        finally:
+            os.close(fd)
+
+    def _http_once(self, req):
+        """Jedno HTTP volání. HTTPError (4xx/5xx) vrací jako (status, tělo, hlavičky)."""
+        try:
+            with urllib.request.urlopen(req, timeout=60) as r:
+                return r.status, r.read(), r.headers
+        except urllib.error.HTTPError as e:
+            return e.code, e.read(), e.headers
 
     def _do(self, req):
         if self.verbose:
@@ -220,17 +359,37 @@ class Client:
                 raise
             except Exception as e:
                 raise Nedostupne(f"fetch z prohlížeče selhal: {e}")
-        try:
-            with urllib.request.urlopen(req, timeout=60) as r:
-                raw = r.read()
-                return r.status, raw
-        except urllib.error.HTTPError as e:
-            return e.code, e.read()
-        except (urllib.error.URLError, TimeoutError, OSError) as e:
-            raise Nedostupne(f"Chyba spojení: {getattr(e, 'reason', e)}")
+        last_net = None
+        for attempt in range(MAX_RETRIES + 1):
+            self._pace_enter()
+            try:
+                try:
+                    status, raw, headers = self._http_once(req)
+                except (urllib.error.URLError, TimeoutError, OSError) as e:
+                    last_net = e
+                    status = raw = headers = None
+            finally:
+                self._pace_exit()
+            if status is not None and (status not in RETRY_STATUSES or attempt >= MAX_RETRIES):
+                return status, raw
+            if attempt >= MAX_RETRIES:
+                raise Nedostupne(f"Chyba spojení: {getattr(last_net, 'reason', last_net)}")
+            if status is None:
+                why = f"Chyba spojení: {getattr(last_net, 'reason', last_net)}"
+                delay = RETRY_BACKOFF[min(attempt, len(RETRY_BACKOFF) - 1)]
+            else:
+                why = f"HTTP {status}"
+                delay = _retry_delay(headers, attempt)
+            print(f"⚠ e-Sbírka {why} – čekám {_fmt_secs(delay)} s a opakuji ({attempt + 2}/{MAX_RETRIES + 1})",
+                  file=sys.stderr)
+            sys.stderr.flush()
+            time.sleep(delay)
 
     def _looks_dead(self, status, raw):
-        """403/429/5xx nebo odpověď, která není JSON (typicky HTML stránka WAF / výpadku)."""
+        """403/429/5xx nebo odpověď, která není JSON (typicky HTML stránka WAF / výpadku).
+
+        429 a 502–504 se před tím opakují v _do; sem se dostanou až po vyčerpání pokusů.
+        """
         if status in (403, 429) or status >= 500:
             return True
         head = (raw or b"").lstrip()[:1]
@@ -441,17 +600,41 @@ def render_fragments(frags, fmt="md"):
     return "\n".join(out).strip() + "\n"
 
 
-def all_fragments(c, stale_url, params=None):
-    """Stáhne všechny stránky fragmentů (stránka = 1000 fragmentů; u velkých kodexů ~10 stránek)."""
+def all_fragments(c, stale_url, params=None, until_id=None):
+    """Stáhne stránky fragmentů (stránka = 1000 fragmentů).
+
+    until_id: přestat, jakmile je podstrom tohoto fragmentu (prefix ELI) kompletní.
+    Vrací fragmenty od začátku znění po konec podstromu včetně. Bez until_id stáhne celé znění.
+    """
     page = 0
     frags = []
+    prefix = None
+    seen = False
     while True:
         p = {"cisloStranky": page}
         p.update(params or {})
         d = c.dok(stale_url, "fragmenty", params=p, cache=True)
-        frags.extend(d.get("seznam", []))
+        batch = d.get("seznam") or []
+        if until_id is None:
+            frags.extend(batch)
+        else:
+            for f in batch:
+                frags.append(f)
+                if not seen:
+                    if f.get("id") != until_id:
+                        continue
+                    seen = True
+                    eli = f.get("eli") or ""
+                    prefix = (eli + "/") if eli else None
+                    if prefix is None:
+                        return frags
+                    continue
+                eli = f.get("eli") or ""
+                if not eli.startswith(prefix):
+                    frags.pop()
+                    return frags
         page += 1
-        if page >= int(d.get("pocetStranek", 1)):
+        if page >= int(d.get("pocetStranek") or 1) or not batch:
             break
     return frags
 
@@ -606,7 +789,7 @@ def cmd_par(c, a):
         d = c.dok(su)
         su = d.get("staleUrl", su)  # normalizace na konkrétní znění
         hit, hits = _resolve_par(c, su, a.ustanoveni)
-        frags = all_fragments(c, su)
+        frags = all_fragments(c, su, until_id=hit["fragmentId"])
     except Nedostupne as e:
         _ui_fallback(c, e, "text ustanovení")
         return _ui_print_text(c, su, a.ustanoveni, a.format)
@@ -629,19 +812,22 @@ def cmd_text(c, a):
     try:
         d = c.dok(su)
         su = d.get("staleUrl", su)
-        frags = all_fragments(c, su)
+        h_od = h_do = None
+        if a.od:
+            h_od, _ = _resolve_par(c, su, a.od)
+        if a.do:
+            h_do, _ = _resolve_par(c, su, a.do)
+        frags = all_fragments(c, su, until_id=h_do["fragmentId"] if h_do else None)
     except Nedostupne as e:
         _ui_fallback(c, e, "text znění")
         return _ui_print_text(c, su, a.od, a.format) if (a.od and not a.do) else _ui_print_text(c, su, None, a.format)
     if a.od or a.do:
         ids = [f.get("id") for f in frags]
         i0, i1 = 0, len(frags)
-        if a.od:
-            h, _ = _resolve_par(c, su, a.od)
-            i0 = ids.index(h["fragmentId"])
-        if a.do:
-            h, _ = _resolve_par(c, su, a.do)
-            last = subtree(frags, h["fragmentId"])[-1]
+        if h_od:
+            i0 = ids.index(h_od["fragmentId"])
+        if h_do:
+            last = subtree(frags, h_do["fragmentId"])[-1]
             i1 = ids.index(last["id"]) + 1
         frags = frags[i0:i1]
     if a.format != "json":
@@ -741,6 +927,10 @@ def cmd_diagnose(c, a):
     print(f"env soubor: {ENV_FILE} {'(existuje)' if os.path.exists(ENV_FILE) else '(CHYBÍ)'}")
     print(f"klíč: {'nastaven (' + str(len(cfg.get('ESBIRKA_API_KEY', ''))) + ' znaků)' if cfg.get('ESBIRKA_API_KEY') else 'NENÍ – používá se veřejná cache portálu'}")
     print(f"aktivní base: {c.base}  (transport: {c.transport}{', ui' if c.ui else ''})")
+    if c.min_interval > 0:
+        print(f"tempo: {c.min_interval:g} s mezi požadavky, jedno probíhající spojení (ESBIRKA_MIN_INTERVAL)")
+    else:
+        print("tempo: vypnuto (ESBIRKA_MIN_INTERVAL=0)")
     try:
         mod = _browser_module()
         kde = mod.playwright_status()
@@ -756,13 +946,21 @@ def cmd_diagnose(c, a):
         print(f"veřejná cache: HTTP {st}  {raw[:80]!r}")
         return
     ok = None
-    for mode, name in AUTH_CANDIDATES:
+    ordered = []
+    memo = load_auth_memo()
+    if memo and memo.get("mode") and memo.get("name"):
+        ordered.append((memo["mode"], memo["name"]))
+    for cand in AUTH_CANDIDATES:
+        if cand not in ordered:
+            ordered.append(cand)
+    for mode, name in ordered:
         req = c._build("GET", "/sbirky", None, None, (mode, name))
         req.full_url = req.full_url.replace(c.base, API_BASE, 1)
         st, raw = c._do(req)
         print(f"  {mode:6} {name:15} → HTTP {st}  {raw[:70]!r}")
-        if st == 200 and ok is None:
+        if st == 200:
             ok = (mode, name)
+            break
     if ok:
         save_auth_memo(*ok)
         print(f"\n✓ Funguje: {ok[0]}:{ok[1]} (zapamatováno v {auth_memo_path()}). "

@@ -36,7 +36,11 @@ Napevno lze způsob zadat řádkem `ESBIRKA_AUTH=header:esel-api-access-key` v e
 
 Skript používá pouze standardní knihovnu Pythonu 3 – žádné závislosti.
 
-**Když REST rozhraní nefunguje** (chyba spojení, 403/429/5xx, HTML místo JSON), skript se sám přepne na
+**Tempo.** Mezi HTTP požadavky je mezera 1 s a jen jedno probíhající spojení (i mezi souběžnými procesy).
+HTTP 429, 502–504 a chybu spojení skript sám zopakuje (až třikrát, s odstupem). Teprve potom platí přepnutí níže.
+`ESBIRKA_MIN_INTERVAL` mezeru změní (`0` ji vypne). Podrobnosti a zdroje: `reference/api.md`, ověřeno 19. 10. 2026.
+
+**Když REST rozhraní nefunguje** (po vyčerpání opakování: chyba spojení, 403/429/5xx, HTML místo JSON), skript se sám přepne na
 headless prohlížeč (Playwright): dotazy pošle z kontextu portálu e-sbirka.gov.cz, a selže-li i to, přečte
 vykreslené stránky (`search`, `par`, `text`). Vyžaduje jednorázově `esbirka setup-browser` (venv + Chromium).
 Ručně: `--browser` (všechny příkazy přes prohlížeč), `--ui` (čtení stránek). Výstup z prohlížeče nese
@@ -87,8 +91,9 @@ Každý příkaz má `--json` (surová odpověď) nebo `--format json|html|text|
 2. **Urči rozhodné datum.** Pro právní posouzení je určující znění účinné v den rozhodné skutečnosti
    (uzavření smlouvy, zahájení řízení, spáchání skutku, podání návrhu), nikoli dnešní. Bez data použij
    aktuální znění a výslovně to uveď. `info --k DATUM` vrátí přesný interval účinnosti znění a novely, které jej založily.
-3. **Načti text** (`par` / `text`). U kodexů první stažení trvá několik sekund (text je stránkován po 1000 fragmentech),
-   další dotazy jdou z cache.
+3. **Načti text** (`par` / `text`). Příkazy `esbirka` pouštěj po jednom, ne paralelně. `par` už vrací hlavičku znění,
+   samostatné `info` před ním není potřeba. U kodexů první stažení trvá déle (stránky po 1000 fragmentech a mezera
+   mezi požadavky), další dotazy jdou z cache. Když skript hlásí opakování po HTTP 429, nepouštěj příkaz znovu.
 4. **Cituj přesně.** V odpovědi vždy uveď: úplnou citaci předpisu, označení ustanovení, *znění účinné od … do …*
    a případně novelu, která znění založila. Vzor: „§ 2079 odst. 1 zákona č. 89/2012 Sb., občanský zákoník,
    ve znění účinném od 1. 12. 2018 do 30. 6. 2020 (novela č. 171/2018 Sb.)“.
@@ -103,7 +108,8 @@ Každý příkaz má `--json` (surová odpověď) nebo `--format json|html|text|
 - Fulltext `search` hledá i v nálezech ÚS, sděleních a mezinárodních smlouvách – filtruj podle kódu a stavu.
 - `nabidka-ustanoveni` (použitá v `par`) našeptává podle označení; u předpisů členěných na články zadej `"čl. 5"`.
 - Datum ve staleUrl **před účinností předpisu** nebo po zrušení vrací `DOKUMENT_NENALEZEN` – použij `zneni` a vyber platný interval.
-- Veřejné API je určeno pro čtení; limity nejsou publikovány – neprocházej hromadně celé sbírky, stahuj cíleně.
+- Veřejné API je určeno pro čtení. Číselný limit není publikován (žádost o klíč sbírá požadavky za sekundu
+  a souběžná spojení; strop je v dopise MV). Skript drží mezeru 1 s. Neprocházej hromadně celé sbírky, stahuj cíleně.
 - Klíč nikdy nevkládej do SKILL.md, příkladů, logů ani do gitu.
 
 ## Související zdroje
