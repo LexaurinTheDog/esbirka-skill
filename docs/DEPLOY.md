@@ -77,7 +77,7 @@ Statický hosting bez buildu, kořenový adresář `docs/`:
 
 Zdroj pravdy o funkcích je repozitář (README, SKILL.md). Při změně verze skillu upravte:
 
-- číslo verze v hlavičce stránky (`<small>v1.1.0</small>`),
+- číslo verze v hlavičce stránky (`<small>v1.2.0</small>`),
 - počet testů, pokud se změní (`27 živých testů v CI`, § 12),
 - tabulku příkazů v části šesté, přibude-li příkaz,
 - data časové osy jen tehdy, změní-li se ukázkový předpis; jsou to skutečné hodnoty z `esbirka zneni 89/2012`

@@ -201,7 +201,7 @@ footer .kofi img{display:block}
 
 <header class="top">
   <div class="wrap">
-    <a class="brand" href="#"><span class="sig">§</span>esbirka-skill <small>v1.1.0</small></a>
+    <a class="brand" href="#"><span class="sig">§</span>esbirka-skill <small>v1.2.0</small></a>
     <nav class="top" aria-label="Sekce">
       <ul>
         <li><a href="#umi">Co umí</a></li>
@@ -221,8 +221,8 @@ footer .kofi img{display:block}
     <div>
       <p class="eyebrow">Skill pro Claude Code · Codex · Agent Skills</p>
       <h1 style="margin-top:.6rem">Zákony a jejich časová znění z oficiální e&#8209;Sbírky, přímo v&nbsp;kódovacím agentovi.</h1>
-      <p class="lead">Agent se zeptá e-Sbírky, jak zněl paragraf k rozhodnému dni, které znění platilo, co změnila novela a čím byl předpis zrušen. Odpoví doslovným textem a přesnou citací znění. Jeden skript v Pythonu, bez závislostí.</p>
-      <p class="abstract">An agent skill for querying the official Czech legislation portal e-Sbírka: find an act, list its time versions, read a section as in force on a given date, diff two versions, list amendments. Works with or without an API key.</p>
+      <p class="lead">Agent se zeptá e-Sbírky, jak zněl paragraf k rozhodnému dni, které znění platilo, co změnila novela a čím byl předpis zrušen. Odpoví doslovným textem a přesnou citací znění. Jeden skript v Pythonu, bez závislostí. Mezi dotazy nechává mezeru, aby rozhraní stihlo odpovědět.</p>
+      <p class="abstract">An agent skill for querying the official Czech legislation portal e-Sbírka: find an act, list its time versions, read a section as in force on a given date, diff two versions, list amendments. Works with or without an API key and paces requests so the API can answer.</p>
       <div class="install">
         <div class="cmd"><span class="p">$</span><code>npx skills add LexaurinTheDog/esbirka-skill -g -y</code><button class="copy" data-copy="npx skills add LexaurinTheDog/esbirka-skill -g -y">Kopírovat</button></div>
         <div class="cmd"><span class="p">/</span><code>plugin marketplace add LexaurinTheDog/esbirka-skill</code><button class="copy" data-copy="/plugin marketplace add LexaurinTheDog/esbirka-skill">Kopírovat</button></div>
@@ -357,6 +357,7 @@ novely tohoto znění: 171/2018 Sb.
       <div class="sec">
         <p class="num">§ 6 &nbsp;API klíč</p>
         <p>Klíč k registrovanému API přiděluje Ministerstvo vnitra na žádost datovou schránkou. Uloží se do <code>~/.claude/esbirka.env</code> jako <code>ESBIRKA_API_KEY=…</code> a posílá se v hlavičce <code>esel-api-access-key</code>, kterou dopis MV neuvádí. <strong>Bez klíče skill funguje také</strong>, přes veřejnou cache portálu se stejnými daty. Ověření: <code>esbirka diagnose</code>.</p>
+        <p>Od verze 1.2.0 skill mezi HTTP požadavky nechává mezeru <strong>1 s</strong> a drží jedno probíhající spojení, i když agent spustí víc příkazů najednou. Číselný limit API není veřejný; žádost o klíč se ptá na počet požadavků za sekundu a souběžných spojení. Při HTTP 429, 502–504 a chybě spojení skript dotaz sám zopakuje, až třikrát, a teprve potom přepne na další cestu. Mezeru mění <code>ESBIRKA_MIN_INTERVAL</code> (sekundy, <code>0</code> tempo vypne).</p>
       </div>
     </div>
   </div>
@@ -378,11 +379,11 @@ novely tohoto znění: 171/2018 Sb.
           <div class="path"><b>Prohlížeč</b><span>Chromium otevře portál a stejné dotazy pošle z jeho kontextu</span><code>--browser</code></div>
           <div class="path"><b>Vykreslené stránky</b><span>čtení výsledků hledání a textu předpisu přímo z DOM</span><code>--ui</code></div>
         </div>
-        <p class="note">Přepnutí spustí chyba spojení, HTTP 403/429/5xx nebo HTML místo JSON. Cesty 3 a 4 vyžadují Playwright, který se instaluje jednou příkazem <code>esbirka setup-browser</code> do izolovaného venv. Výstup z prohlížeče je označen <code>zdroj: portál (prohlížeč)</code>.</p>
+        <p class="note">Na prohlížeč se přepne až po opakování: chyba spojení, HTTP 403/429/5xx nebo HTML místo JSON. HTTP 429, 502–504 a chybu spojení skript nejdřív zopakuje, až třikrát; odstup bere z hlavičky <code>Retry-After</code>, jinak čeká 1 s, 2 s a 4 s. Mezi požadavky je mezera 1 s a jedno spojení. Cesty 3 a 4 vyžadují Playwright, který se instaluje jednou příkazem <code>esbirka setup-browser</code> do izolovaného venv. Výstup z prohlížeče je označen <code>zdroj: portál (prohlížeč)</code>.</p>
       </div>
       <div class="sec">
         <p class="num">§ 8 &nbsp;Co je pod tím</p>
-        <p>Skript volá rozhraní e-Sbírky: detail znění, historii, fragmenty textu po tisících, našeptávač ustanovení, rozdílové fragmenty, souvislosti a jednoduché vyhledávání. Katalog endpointů, filtrů a číselníků, ověřený živě, je v <a href="https://github.com/LexaurinTheDog/esbirka-skill/blob/main/skills/esbirka/reference/api.md">reference/api.md</a>. Oficiální dokumentace MV nebyla v době vzniku dostupná; katalog vznikl z funkční specifikace veřejného API a klienta portálu.</p>
+        <p>Skript volá rozhraní e-Sbírky: detail znění, historii, fragmenty textu po tisících, našeptávač ustanovení, rozdílové fragmenty, souvislosti a jednoduché vyhledávání. Příkaz <code>par</code> a rozsah <code>text --do</code> stáhne fragmenty jen po konec hledaného ustanovení. Katalog endpointů, filtrů, číselníků a tempa volání je v <a href="https://github.com/LexaurinTheDog/esbirka-skill/blob/main/skills/esbirka/reference/api.md">reference/api.md</a>. Služby vycházejí z funkční specifikace veřejného API a klienta portálu; tempo je ověřené 19. 10. 2026 podle veřejného článku Použití REST API, žádosti o registraci a téhož klienta.</p>
       </div>
     </div>
   </div>
@@ -407,6 +408,7 @@ Otázka na změny?
 ├─ „co se změnilo“          → <b>zneni</b> → <b>diff</b> --z D1 --k D2 [--par "§ N"]
 ├─ „kdo novelizoval / ruší“ → <b>souvislosti</b> --typ JE_MENEN | JE_RUSEN | MENI | RUSI
 └─ „platí to ještě“         → <b>info</b> (datumZruseni) a <b>zneni</b> (BUDOUCI)</pre>
+        <p class="note">Příkazy <code>esbirka</code> spouštějte po jednom. <code>par</code> už vrací hlavičku znění, samostatné <code>info</code> před ním není potřeba. Když skript vypíše, že po HTTP 429 čeká a opakuje, další příkaz nespouštějte.</p>
       </div>
       <div class="sec">
         <p class="num">§ 10 &nbsp;Pravidla odpovědi</p>
@@ -443,10 +445,11 @@ Otázka na změny?
           <tr><td><code>souvislosti PŘEDPIS</code></td><td>novelizuje, je novelizován, ruší, je rušen, provádí, nálezy ÚS</td><td><code>--typ --limit</code></td></tr>
           <tr><td><code>castka sb ROK ČÍSLO</code></td><td>metadata částky a odkaz na právně závazné PDF</td><td></td></tr>
           <tr><td><code>raw GET|POST CESTA</code></td><td>libovolný endpoint podle reference/api.md</td><td></td></tr>
-          <tr><td><code>diagnose</code></td><td>klíč, hlavička, dostupnost, Playwright</td><td></td></tr>
+          <tr><td><code>diagnose</code></td><td>klíč, hlavička, tempo, dostupnost, Playwright</td><td></td></tr>
           <tr><td><code>setup-browser</code></td><td>Playwright a Chromium pro záložní režim</td><td></td></tr>
         </tbody>
       </table></div>
+      <p class="note">Mezera mezi požadavky je 1 s (<code>ESBIRKA_MIN_INTERVAL</code>). <code>par</code> a <code>text --do</code> nestahují fragmenty za koncem ustanovení.</p>
     </div>
   </div>
 </section>
@@ -464,7 +467,7 @@ Otázka na změny?
       </div>
       <div class="sec">
         <p class="num">§ 12 &nbsp;Licence a přispívání</p>
-        <p>Kód je pod licencí MIT. Chyby a návrhy patří do <a href="https://github.com/LexaurinTheDog/esbirka-skill/issues">Issues</a>. Pravidla: žádné klíče ani osobní údaje v kódu a příkladech; každou změnu chování ověřit živě proti e-Sbírce; CI kontroluje kompilaci, instalaci do čistého prostředí, 27 živých dotazů a nepřítomnost klíčů.</p>
+        <p>Kód je pod licencí MIT. Chyby a návrhy patří do <a href="https://github.com/LexaurinTheDog/esbirka-skill/issues">Issues</a>. Pravidla: žádné klíče ani osobní údaje v kódu a příkladech; každou změnu chování ověřit živě proti e-Sbírce; CI kontroluje kompilaci, instalaci do čistého prostředí, jednotkové testy tempa a opakování, 27 živých dotazů a nepřítomnost klíčů.</p>
       </div>
     </div>
   </div>
